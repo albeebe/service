@@ -48,6 +48,13 @@ func Text(statusCode int, text string) *HTTPResponse {
 	return r
 }
 
+// Textf formats a string with the provided arguments and sets the HTTP response
+// with the given status code and the formatted plain text body.
+// It is a variant of the Text function that supports formatted text using fmt.Sprintf.
+func Textf(statusCode int, text string, args ...any) *HTTPResponse {
+	return Text(statusCode, fmt.Sprintf(text, args))
+}
+
 // JSON sets the HTTP response with the provided status code and a JSON-encoded
 // body generated from the provided object. If an error occurs during the JSON
 // encoding process (e.g., unsupported types or invalid data), the function
@@ -70,6 +77,11 @@ func JSON(statusCode int, obj interface{}) *HTTPResponse {
 	}()
 	r.Body = pr
 	return r
+}
+
+// InternalServiceError returns an HTTP 500 response with a standard "internal service error" message.
+func InternalServiceError() *HTTPResponse {
+	return Text(500, "internal service error")
 }
 
 // Returns true if we're currently running on GCP
