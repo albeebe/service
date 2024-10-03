@@ -96,11 +96,18 @@ func New(serviceName string, config Config) (*Service, error) {
 	return s, nil
 }
 
-// Run starts the service and blocks, waiting for an OS termination signal, context cancellation,
-// or an error from the internal router. When termination begins—whether due to an interrupt
-// signal, context cancellation, or an error—the provided terminating function is called. The
-// function returns only after the service has gracefully shut down.
-func (s *Service) Run(terminating func(error)) {
+// Run starts the service and blocks, waiting for an OS signal, context cancellation, or an error.
+// Lifecycle callbacks from the State struct are invoked at each stage:
+// - `Starting`: Called when the service starts.
+// - `Running`: Called when the service is running.
+// - `Terminating`: Called during shutdown, with an error if one triggered the termination.
+//
+// The function returns only after the service has gracefully shut down.
+func (s *Service) Run(state State) {
+
+	if state.Starting != nil {
+		state.Starting()
+	}
 
 	// Start the auth service
 	if s.internal.auth != nil {
@@ -113,13 +120,22 @@ func (s *Service) Run(terminating func(error)) {
 	defer signal.Stop(terminate)
 
 	// Block until we get a terminate signal, or the context is canceled
+	if state.Running != nil {
+		state.Running()
+	}
 	select {
 	case <-terminate:
-		terminating(nil)
+		if state.Terminating != nil {
+			state.Terminating(nil)
+		}
 	case <-s.Context.Done():
-		terminating(nil)
+		if state.Terminating != nil {
+			state.Terminating(nil)
+		}
 	case err := <-s.internal.router.ListenAndServe():
-		terminating(err)
+		if state.Terminating != nil {
+			state.Terminating(err)
+		}
 	}
 
 	// Cancel the context to initiate the graceful shutdown
@@ -150,6 +166,15 @@ func (s *Service) Run(terminating func(error)) {
 // process but does not block or wait for the service to fully stop.
 func (s *Service) Shutdown() {
 	s.internal.cancel()
+}
+
+// AddAuthProvider initializes the authentication provider for the service.
+func (s *Service) AddAuthProvider(authProvider auth.AuthProvider) error {
+	var err error
+	s.internal.auth, err = auth.New(s.Context, auth.Config{
+		AuthProvider: authProvider,
+	})
+	return err
 }
 
 // AddAuthenticatedEndpoint registers an HTTP endpoint that requires authentication.
@@ -423,13 +448,14 @@ func (s *Service) AddPubSub(relativePath string, handler func(*Service, PubSubMe
 // AuthClient returns an *http.Client that automatically attaches JWT tokens to requests
 // and refreshes them as needed. It requires the service to have been initialized with an AuthProvider.
 func (s *Service) AuthClient() (*http.Client, error) {
+
 	// Check that the service has an initialized AuthProvider
 	if s.internal.auth == nil {
 		return nil, errors.New("AddServiceEndpoint requires the service to be initialized with an AuthProvider")
 	}
 
 	// Retrieve the http.Client from the AuthProvider
-	client, err := s.internal.auth.Client()
+	client, err := s.internal.auth.NewAuthClient()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create client: %w", err)
 	}

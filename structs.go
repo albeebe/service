@@ -53,13 +53,12 @@ type Service struct {
 }
 
 type Config struct {
-	AuthProvider       auth.AuthProvider // AuthProvider interface implementation responsible for handling authentication tasks
-	CloudSQLConnection string            // Cloud SQL instance connection string in the format "project:region:instance"
-	CloudSQLDatabase   string            // Name of the specific database within the Cloud SQL instance
-	CloudSQLUser       string            // Username for accessing the Cloud SQL database
-	GCPProjectID       string            // Google Cloud Platform Project ID where the service is deployed
-	Host               string            // The host address where the service listens for incoming requests (e.g., ":8080")
-	ServiceAccount     string            // Service account email used for authentication with GCP resources
+	CloudSQLConnection string // Cloud SQL instance connection string in the format "project:region:instance"
+	CloudSQLDatabase   string // Name of the specific database within the Cloud SQL instance
+	CloudSQLUser       string // Username for accessing the Cloud SQL database
+	GCPProjectID       string // Google Cloud Platform Project ID where the service is deployed
+	Host               string // The host address where the service listens for incoming requests (e.g., ":8080")
+	ServiceAccount     string // Service account email used for authentication with GCP resources
 }
 
 type HTTPResponse struct {
@@ -72,6 +71,12 @@ type PubSubMessage struct {
 	ID        string    `json:"id"`        // Unique identifier for the message.
 	Published time.Time `json:"published"` // Time the message was published.
 	Data      []byte    `json:"data"`      // Data payload of the message as a byte slice.
+}
+
+type State struct {
+	Starting    func()          // Called when the service is starting
+	Running     func()          // Called when the service is running
+	Terminating func(err error) // Called when the service is terminating, with an optional error if it was due to a failure
 }
 
 type internal struct {
