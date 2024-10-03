@@ -36,6 +36,20 @@ var errorAlgMissing = errors.New("alg is missing")
 var errorKidMissing = errors.New("kid is missing")
 var errorKeyNotFound = errors.New("key not found")
 
+// getAccessToken safely retrieves the current access token if available.
+// Returns the token and a boolean indicating whether the token was found.
+func (a *Auth) getAccessToken() (*AccessToken, bool) {
+	a.mux.RLock()
+	defer a.mux.RUnlock()
+	if a.accessToken == nil {
+		return nil, false
+	}
+	if a.accessToken.Expires.Before(time.Now()) {
+		return nil, false
+	}
+	return a.accessToken, true
+}
+
 // awaitKey checks if a key with the given `kid` exists. If found, it returns the key and `true`.
 // If the key doesn't exist but keys are currently being refreshed, it waits for up to 5 seconds,
 // checking every second for the key to become available. If the key is not found and no refresh
@@ -78,6 +92,31 @@ func (a *Auth) keyWithID(id string) (*Key, bool) {
 	defer a.mux.RUnlock()
 	key, ok := a.keys[id]
 	return key, ok
+}
+
+// refreshAccessToken retrieves a new access token from the auth provider, stores it,
+// and schedules the next refresh time. Returns the token or an error if the refresh fails.
+func (a *Auth) refreshAccessToken() (*AccessToken, error) {
+
+	// Fetch the access token from the auth provider
+	accessToken, nextRefresh, err := a.authProvider.RefreshAccessToken()
+	if err != nil {
+		return nil, fmt.Errorf("authProvider failed to refresh access token: %w", err)
+	}
+	if accessToken == nil {
+		return nil, fmt.Errorf("authProvider returned a nil AccessToken")
+	}
+	if len(accessToken.Token) == 0 {
+		return nil, fmt.Errorf("authProvider returned an AccessToken without a token")
+	}
+
+	// Store the access token and schedule the next time it should be refreshed
+	a.mux.Lock()
+	defer a.mux.Unlock()
+	a.accessToken = accessToken
+	a.nextAccessTokenRefresh = &nextRefresh
+
+	return accessToken, nil
 }
 
 // refreshKeys fetches new keys from the auth provider, validates them,

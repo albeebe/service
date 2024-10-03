@@ -29,11 +29,13 @@ import (
 
 type AuthProvider interface {
 
-	// RefreshKeys retrieves updated authentication keys and the scheduled time for the next key refresh.
-	// It returns a slice of keys, the time for the next refresh, and an error if the operation fails.
-	RefreshKeys() (keys []*Key, nextRefresh time.Time, err error)
-
 	// IsServiceRequest checks whether the given HTTP request originates from a service.
 	// It returns true if the request is identified as a service request, otherwise false.
 	IsServiceRequest(r *http.Request) (isService bool)
+
+	RefreshAccessToken() (accessToken *AccessToken, nextRefresh time.Time, err error)
+
+	// RefreshKeys retrieves updated authentication keys and the scheduled time for the next key refresh.
+	// It returns a slice of keys, the time for the next refresh, and an error if the operation fails.
+	RefreshKeys() (keys []*Key, nextRefresh time.Time, err error)
 }

@@ -25,23 +25,40 @@ package auth
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"sync"
 	"time"
+
+	"golang.org/x/sync/singleflight"
 )
 
 type Auth struct {
-	ctx               context.Context
-	authProvider      AuthProvider
-	errorChan         chan error
-	keys              map[string]*Key
-	mux               sync.RWMutex
-	nextKeyRefresh    time.Time
-	refreshKeysTicker *time.Ticker
-	start             sync.Once
+	ctx                      context.Context
+	accessToken              *AccessToken
+	authProvider             AuthProvider
+	errorChan                chan error
+	keys                     map[string]*Key
+	mux                      sync.RWMutex
+	nextAccessTokenRefresh   *time.Time
+	nextKeyRefresh           time.Time
+	refreshAccessTokenTicker *time.Ticker
+	refreshKeysTicker        *time.Ticker
+	start                    sync.Once
+	tokenRefresher           singleflight.Group
+}
+
+type AuthClient struct {
+	auth         *Auth
+	roundTripper http.RoundTripper
 }
 
 type Config struct {
 	AuthProvider AuthProvider
+}
+
+type AccessToken struct {
+	Token   string
+	Expires time.Time
 }
 
 type Key struct {

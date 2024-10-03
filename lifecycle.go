@@ -35,7 +35,6 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/albeebe/service/internal/pubsub"
 	"github.com/albeebe/service/internal/router"
-	"github.com/albeebe/service/pkg/auth"
 	"google.golang.org/api/option"
 )
 
@@ -48,7 +47,6 @@ func (s *Service) setup() error {
 		Function func() error
 	}
 	components := []Component{
-		{"Auth", s.setupAuth},
 		{"Cloud SQL", s.setupCloudSQL},
 		{"Cloud Storage", s.setupCloudStorage},
 		{"Cloud Tasks", s.setupCloudTasks},
@@ -85,17 +83,6 @@ func (s *Service) setup() error {
 	}
 
 	return finalErr
-}
-
-// setupAuth initializes the auth package if an AuthProvider is configured.
-func (s *Service) setupAuth() (err error) {
-	if s.internal.config.AuthProvider == nil {
-		return nil
-	}
-	s.internal.auth, err = auth.New(s.Context, auth.Config{
-		AuthProvider: s.internal.config.AuthProvider,
-	})
-	return err
 }
 
 // setupCloudSQL initializes the Cloud SQL database connection using the provided configuration.

@@ -55,18 +55,19 @@ func New(ctx context.Context, config Config) (*Auth, error) {
 	return &a, nil
 }
 
-// Start initializes the auth service and begins a periodic key refresh using a ticker.
+// Start initializes the auth service and begins a periodic refresh using a ticker.
 // This function ensures that the service is started only once and returns an error channel
-// that reports any issues encountered during key refreshes. Consumers of this function
+// that reports any issues encountered during refreshes. Consumers of this function
 // must listen to the returned error channel to prevent it from blocking when errors occur.
 func (a *Auth) Start() chan error {
 
 	// Ensure the auth service is started only once
 	a.start.Do(func() {
-		// Initialize the ticker for periodic key refresh.
+		// Initialize the tickers for periodic key and access token refresh.
 		a.refreshKeysTicker = time.NewTicker(time.Second)
+		a.refreshAccessTokenTicker = time.NewTicker(time.Second)
 
-		// Start a goroutine to handle periodic key refresh and graceful shutdown on context cancellation.
+		// Start a goroutine to handle periodic refresh and graceful shutdown on context cancellation.
 		go func() {
 			defer a.refreshKeysTicker.Stop() // Ensure the ticker is stopped when the goroutine exits.
 			// Immediately refresh the keys
@@ -75,14 +76,17 @@ func (a *Auth) Start() chan error {
 			}
 			for {
 				select {
-				case <-a.refreshKeysTicker.C:
-					// Check if it's time to refresh the keys
-					if time.Now().Before(a.nextKeyRefresh) {
-						continue // Skip refresh because it's not time yet
+				case <-a.refreshAccessTokenTicker.C:
+					// Refresh the access token if it's time
+					if a.nextAccessTokenRefresh != nil && a.nextAccessTokenRefresh.Before(time.Now()) {
+						a.refreshAccessToken()
 					}
-					// Perform key refresh
-					if err := a.refreshKeys(); err != nil {
-						a.errorChan <- err
+				case <-a.refreshKeysTicker.C:
+					// Refresh the keys if it's time
+					if time.Now().After(a.nextKeyRefresh) {
+						if err := a.refreshKeys(); err != nil {
+							a.errorChan <- err
+						}
 					}
 				case <-a.ctx.Done():
 					a.shutdown()
@@ -126,10 +130,6 @@ func (a *Auth) Authenticate(r *http.Request) (authenticated bool, reason string,
 	}
 
 	return isValid, reason, nil
-}
-
-func (a *Auth) Client() (*http.Client, error) {
-	return nil, nil
 }
 
 // IsServiceRequest checks whether the given HTTP request originates from a service.
