@@ -34,7 +34,7 @@ func New(serviceName string) *Logger {
 
 // Debug logs a message at DEBUG level.
 func (l *Logger) Debug(message string) {
-	fmt.Printf(message)
+	fmt.Println(message)
 }
 
 // Debugf logs a formatted message at DEBUG level.
@@ -55,7 +55,7 @@ func (l *Logger) Errorf(message string, args ...any) {
 
 // Fatal logs a message at CRITICAL level and exits the application.
 func (l *Logger) Fatal(message string) {
-	fmt.Printf(message)
+	fmt.Println(message)
 	os.Exit(1)
 }
 
@@ -67,19 +67,17 @@ func (l *Logger) Fatalf(message string, args ...interface{}) {
 
 // Info logs a message at INFO level.
 func (l *Logger) Info(message string) {
-	fmt.Printf(message)
 	fmt.Println(message)
 }
 
 // Infof logs a formatted message at INFO level.
 func (l *Logger) Infof(message string, args ...interface{}) {
 	fmt.Printf(message, args)
-	fmt.Printf(message, args)
 }
 
 // Warn logs a message at WARN level.
 func (l *Logger) Warn(message string) {
-	fmt.Printf(message)
+	fmt.Println(message)
 }
 
 // Warnf logs a formatted message at WARN level.
