@@ -94,13 +94,13 @@ func (s *Service) setupCloudSQL() (err error) {
 
 	// Open the connection to the database
 	dsn := fmt.Sprintf("%s:@%s(%s)/%s?parseTime=true", s.internal.config.CloudSQLUser, mysqlDriver, s.internal.config.CloudSQLConnection, s.internal.config.CloudSQLDatabase)
-	db, err := sql.Open(mysqlDriver, dsn)
+	s.DB, err = sql.Open(mysqlDriver, dsn)
 	if err != nil {
 		return fmt.Errorf("failed to open connection: %w", err)
 	}
 
 	// Verify the connection to the database
-	if err := db.Ping(); err != nil {
+	if err := s.DB.Ping(); err != nil {
 		return fmt.Errorf("failed to ping database: %w", err)
 	}
 
