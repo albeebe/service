@@ -25,6 +25,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -82,6 +83,42 @@ func JSON(statusCode int, obj interface{}) *HTTPResponse {
 // InternalServiceError returns an HTTP 500 response with a standard "internal service error" message.
 func InternalServiceError() *HTTPResponse {
 	return Text(500, "internal service error")
+}
+
+// UnmarshalJSONBody reads the JSON-encoded body of an HTTP request and unmarshals it into the provided target.
+// It returns an error if the request body is empty or if the JSON decoding fails.
+func UnmarshalJSONBody(r *http.Request, target interface{}) error {
+	// Ensure the request body is not nil or empty
+	if r.Body == nil {
+		return errors.New("request body is missing")
+	}
+	defer r.Body.Close()
+
+	// Create a new JSON decoder and decode the body into the target
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(target); err != nil {
+		if err == io.EOF {
+			return errors.New("request body is empty")
+		}
+		// Provide more detailed error messages for common JSON decoding issues
+		var syntaxError *json.SyntaxError
+		var unmarshalTypeError *json.UnmarshalTypeError
+		switch {
+		case errors.As(err, &syntaxError):
+			return fmt.Errorf("malformed JSON at position %d", syntaxError.Offset)
+		case errors.As(err, &unmarshalTypeError):
+			return fmt.Errorf("unexpected JSON type for field %s", unmarshalTypeError.Field)
+		default:
+			return fmt.Errorf("failed to decode JSON body: %w", err)
+		}
+	}
+
+	// Ensure there's no additional data after the valid JSON (e.g., extra commas)
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		return errors.New("request body contains additional unexpected data")
+	}
+
+	return nil
 }
 
 // Returns true if we're currently running on GCP
