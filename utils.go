@@ -80,9 +80,9 @@ func JSON(statusCode int, obj interface{}) *HTTPResponse {
 	return r
 }
 
-// InternalServiceError returns an HTTP 500 response with a standard "internal service error" message.
-func InternalServiceError() *HTTPResponse {
-	return Text(500, "internal service error")
+// InternalServerError returns an HTTP 500 response with a standard "internal server error" message.
+func InternalServerError() *HTTPResponse {
+	return Text(500, "internal server error")
 }
 
 // UnmarshalJSONBody reads the JSON-encoded body of an HTTP request and unmarshals it into the provided target.
