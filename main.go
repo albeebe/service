@@ -572,3 +572,9 @@ func ParseClaimsFromRequest(r *http.Request, claims interface{}) error {
 
 	return nil
 }
+
+// PublishToPubSub sends a message to the specified Pub/Sub topic.
+// It returns the message ID or an error if the operation fails.
+func (s *Service) PublishToPubSub(topic string, message interface{}) (string, error) {
+	return s.internal.pubsub.Publish(topic, message)
+}

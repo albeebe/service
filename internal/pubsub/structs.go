@@ -29,6 +29,8 @@ import (
 	ps "cloud.google.com/go/pubsub"
 )
 
+// PubSub handles publishing messages to Google Pub/Sub topics.
+// It manages the Pub/Sub client and a map of topics for reuse.
 type PubSub struct {
 	ctx    context.Context
 	Client *ps.Client
@@ -36,6 +38,7 @@ type PubSub struct {
 	Mux    sync.RWMutex
 }
 
+// Config holds configuration details for PubSub.
 type Config struct {
 	GCPProjectID string
 }
