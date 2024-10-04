@@ -28,19 +28,23 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 	"time"
 
+	"cloud.google.com/go/iam/credentials/apiv1/credentialspb"
 	"github.com/albeebe/service/internal/credentials"
 	"github.com/albeebe/service/internal/environment"
 	"github.com/albeebe/service/internal/logger"
 	"github.com/albeebe/service/internal/router"
 	"github.com/albeebe/service/pkg/auth"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 // Initialize loads the environment variables specified in the provided spec struct.
@@ -246,7 +250,7 @@ func (s *Service) AddCloudTask(relativePath string, handler func(*Service, *http
 		// Invoke the provided handler function with the request.
 		// If the handler returns an error, log it and respond with a 500 Internal Server Error status.
 		if err := handler(s, c.Request); err != nil {
-			s.Log.Errorf("failed to handle request: %w", err.Error)
+			s.Log.Errorf("failed to handle request: %w", err)
 			sendResponse(c, http.StatusInternalServerError, "internal server error")
 			return
 		}
@@ -283,7 +287,7 @@ func (s *Service) AddCronjob(relativePath string, handler func(*Service, *http.R
 		// Invoke the provided handler function with the request.
 		// If the handler returns an error, log it and respond with a 500 Internal Server Error status.
 		if err := handler(s, c.Request); err != nil {
-			s.Log.Errorf("failed to handle request: %w", err.Error)
+			s.Log.Errorf("failed to handle request: %w", err)
 			sendResponse(c, http.StatusInternalServerError, "internal server error")
 			return
 		}
@@ -429,7 +433,7 @@ func (s *Service) AddPubSub(relativePath string, handler func(*Service, PubSubMe
 		// Invoke the provided handler function with the decoded Pub/Sub message.
 		// If the handler returns an error, log it and respond with a 500 Internal Server Error status.
 		if err := handler(s, message); err != nil {
-			s.Log.Errorf("failed to handle message: %w", err.Error)
+			s.Log.Errorf("failed to handle message: %w", err)
 			sendResponse(c, http.StatusInternalServerError, "internal server error")
 			return
 		}
@@ -461,6 +465,82 @@ func (s *Service) AuthClient() (*http.Client, error) {
 	}
 
 	return client, nil
+}
+
+// GenerateGoogleIDToken generates a Google ID token for a given audience.
+// It uses a service account to create the token, either by impersonating the account
+// in non-production environments or by querying the metadata server in production.
+func (s *Service) GenerateGoogleIDToken(audience string) (string, error) {
+
+	// Ensure a service account is configured
+	if len(s.internal.config.ServiceAccount) == 0 {
+		return "", errors.New("GenerateGoogleIDToken requires a service account to be configured")
+	}
+
+	// Validate that an audience is provided
+	if len(audience) == 0 {
+		return "", errors.New("audience is required")
+	}
+
+	// If not running in production, use the IAM client to impersonate the service account
+	if !runningInProduction() {
+		if s.IAMClient == nil {
+			return "", errors.New("IAMClient is not initialized")
+		}
+
+		// Generate ID token using the IAM client.
+		idTokenResp, err := s.IAMClient.GenerateIdToken(context.Background(), &credentialspb.GenerateIdTokenRequest{
+			Name:         fmt.Sprintf("projects/-/serviceAccounts/%s", s.internal.config.ServiceAccount),
+			Audience:     audience,
+			IncludeEmail: true,
+		})
+		if err != nil {
+			return "", fmt.Errorf("failed to generate ID token: %w", err)
+		}
+
+		// Return the generated ID token.
+		return idTokenResp.Token, nil
+	}
+
+	// In production, retrieve the ID token from the metadata server.
+	req, err := http.NewRequest("GET", "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience="+url.QueryEscape(audience), nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create metadata server request: %w", err)
+	}
+	req.Header.Set("Metadata-Flavor", "Google")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to retrieve ID token from metadata server: %w", err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response body: %w", err)
+	}
+	idToken := string(body)
+
+	// Parse the ID token without validating it, to extract claims.
+	token, _, err := new(jwt.Parser).ParseUnverified(idToken, jwt.MapClaims{})
+	if err != nil {
+		return "", fmt.Errorf("failed to parse ID token: %w", err)
+	}
+
+	// Extract and validate claims from the token, especially the email claim.
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return "", errors.New("failed to parse claims from ID token")
+	}
+	email, ok := claims["email"].(string)
+	if !ok || len(email) == 0 {
+		return "", errors.New("ID token does not contain an email claim")
+	}
+
+	// Validate that the email matches the configured service account.
+	if strings.ToLower(s.internal.config.ServiceAccount) != strings.ToLower(email) {
+		return "", errors.New("service account email does not match the configured service account")
+	}
+
+	return idToken, nil
 }
 
 // ParseClaimsFromRequest extracts the JWT from the Authorization header of the request,
