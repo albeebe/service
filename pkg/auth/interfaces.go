@@ -28,11 +28,16 @@ import (
 )
 
 type AuthProvider interface {
+	// AuthorizeRequest checks if the request meets the specified authorization requirements.
+	// It returns true if the request is authorized, otherwise false, and an error if something goes wrong.
+	AuthorizeRequest(r *http.Request, authRequirements AuthRequirements) (isAuthorized bool, err error)
 
 	// IsServiceRequest checks whether the given HTTP request originates from a service.
 	// It returns true if the request is identified as a service request, otherwise false.
 	IsServiceRequest(r *http.Request) (isService bool)
 
+	// RefreshAccessToken refreshes the current access token.
+	// It returns the new access token, the time for the next refresh, and an error if the operation fails.
 	RefreshAccessToken() (accessToken *AccessToken, nextRefresh time.Time, err error)
 
 	// RefreshKeys retrieves updated authentication keys and the scheduled time for the next key refresh.

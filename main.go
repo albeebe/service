@@ -181,11 +181,15 @@ func (s *Service) AddAuthProvider(authProvider auth.AuthProvider) error {
 	return err
 }
 
-// AddAuthenticatedEndpoint registers an HTTP endpoint that requires authentication.
-// It wraps the provided handler to authenticate requests before passing them through.
+// AddAuthenticatedEndpoint registers an HTTP endpoint that requires authentication
+// and optionally authorization. It first authenticates the request, and if authorization
+// requirements (roles or permissions) are provided, it checks them before passing
+// the request to the handler.
 // If the service was initialized without an AuthProvider, it logs a fatal error and exits.
-// If authentication fails or the handler encounters an error, appropriate HTTP responses are returned.
-func (s *Service) AddAuthenticatedEndpoint(method, relativePath string, handler func(*Service, *http.Request) *HTTPResponse) {
+// If authentication fails, a 401 Unauthorized response is returned. If authorization
+// requirements are provided and the request fails authorization, a 403 Forbidden response is returned.
+// In case of an internal error during processing, a 500 Internal Server Error is returned.
+func (s *Service) AddAuthenticatedEndpoint(method, relativePath string, handler func(*Service, *http.Request) *HTTPResponse, authRequirements ...auth.AuthRequirements) {
 
 	// Confirm an AuthProvider exists
 	if s.internal.auth == nil {
@@ -211,10 +215,27 @@ func (s *Service) AddAuthenticatedEndpoint(method, relativePath string, handler 
 			return
 		}
 
+		// Authorize the request
+		requirements := auth.AuthRequirements{}
+		for _, r := range authRequirements {
+			requirements.AnyRole = append(requirements.AnyRole, r.AnyRole...)
+			requirements.AllPermissions = append(requirements.AllPermissions, r.AllPermissions...)
+		}
+		authorized, err := s.internal.auth.Authorize(c.Request, requirements)
+		if err != nil {
+			s.Log.Errorf("failed to authorize request: %w", err)
+			sendResponse(c, 500, "internal server error")
+			return
+		}
+		if !authorized {
+			sendResponse(c, 403, "forbidden")
+			return
+		}
+
 		// Send the request to the handler and handle the response
 		resp := handler(s, c.Request)
 		if resp == nil {
-			sendResponse(c, 501, "internal server error")
+			sendResponse(c, 500, "internal server error")
 			return
 		}
 		if err := router.SendResponse(c, resp.StatusCode, resp.Headers, resp.Body); err != nil {

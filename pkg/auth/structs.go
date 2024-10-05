@@ -33,32 +33,32 @@ import (
 )
 
 type Auth struct {
-	ctx                      context.Context
-	accessToken              *AccessToken
-	authProvider             AuthProvider
-	errorChan                chan error
-	keys                     map[string]*Key
-	mux                      sync.RWMutex
-	nextAccessTokenRefresh   *time.Time
-	nextKeyRefresh           time.Time
-	refreshAccessTokenTicker *time.Ticker
-	refreshKeysTicker        *time.Ticker
-	start                    sync.Once
-	tokenRefresher           singleflight.Group
+	ctx                      context.Context    // Context for managing request lifetimes
+	accessToken              *AccessToken       // The current access token
+	authProvider             AuthProvider       // Provider for handling authentication logic
+	errorChan                chan error         // Channel for reporting errors during operations
+	keys                     map[string]*Key    // Cached keys used for authentication
+	mux                      sync.RWMutex       // Mutex for synchronizing access to shared resources
+	nextAccessTokenRefresh   *time.Time         // Time for the next access token refresh
+	nextKeyRefresh           time.Time          // Time for the next key refresh
+	refreshAccessTokenTicker *time.Ticker       // Ticker for periodic access token refresh
+	refreshKeysTicker        *time.Ticker       // Ticker for periodic key refresh
+	start                    sync.Once          // Ensures the start logic is executed only once
+	tokenRefresher           singleflight.Group // Group to manage single access token refresh in-flight
 }
 
 type AuthClient struct {
-	auth         *Auth
-	roundTripper http.RoundTripper
+	auth         *Auth             // Reference to the auth instance
+	roundTripper http.RoundTripper // HTTP RoundTripper to intercept and modify requests
 }
 
 type Config struct {
-	AuthProvider AuthProvider
+	AuthProvider AuthProvider // Provider for authentication logic configuration
 }
 
 type AccessToken struct {
-	Token   string
-	Expires time.Time
+	Token   string    // The access token string
+	Expires time.Time // The token's expiration time
 }
 
 type Key struct {
@@ -67,6 +67,11 @@ type Key struct {
 	Exp int64  `json:"exp"` // Exp is the expiration time in Unix time (seconds since the epoch).
 	Alg string `json:"alg"` // Alg specifies the algorithm used with the key (e.g., "RS256").
 	Pem string `json:"pem"` // Key contains the RSA public key in PEM format.
+}
+
+type AuthRequirements struct {
+	AnyRole        []string // At least one of these roles must be present
+	AllPermissions []string // All of these permissions must be granted
 }
 
 // validate checks the Config struct for required fields and
