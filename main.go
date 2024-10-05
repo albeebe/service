@@ -324,12 +324,13 @@ func (s *Service) AddCronjob(relativePath string, handler func(*Service, *http.R
 	}
 }
 
-// AddEndpoint registers a new HTTP endpoint with the specified method (e.g., "GET", "POST")
+// AddPublicEndpoint registers a new HTTP endpoint with the specified method (e.g., "GET", "POST")
 // and relative path. It wraps the provided handler function so that the current Service
 // instance is passed into the handler when the endpoint is invoked.
+// This endpoint does not require authentication.
 // If an error occurs while registering the endpoint, the function will log the error
 // and terminate the program.
-func (s *Service) AddEndpoint(method, relativePath string, handler func(*Service, *http.Request) *HTTPResponse) {
+func (s *Service) AddPublicEndpoint(method, relativePath string, handler func(*Service, *http.Request) *HTTPResponse) {
 
 	// Wrap the handler, so we can pass the service to it and handle sending the response
 	wrappedHandler := func(c *gin.Context) {
