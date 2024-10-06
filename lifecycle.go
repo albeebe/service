@@ -86,7 +86,14 @@ func (s *Service) setup() error {
 }
 
 // setupCloudSQL initializes the Cloud SQL database connection using the provided configuration.
+// If the Cloud SQL connection string is not configured (i.e., empty), the function skips the
+// database setup and returns early with no error, as Cloud SQL is considered optional.
 func (s *Service) setupCloudSQL() (err error) {
+
+	// Return early if Cloud SQL connection is not configured
+	if s.internal.config.CloudSQLConnection == "" {
+		return nil
+	}
 
 	// Set up the driver
 	mysqlDriver := "mysql-driver"
