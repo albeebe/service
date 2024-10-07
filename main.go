@@ -172,6 +172,12 @@ func (s *Service) Shutdown() {
 	s.internal.cancel()
 }
 
+// Config returns the current configuration of the service.
+// It provides access to the internal configuration stored in the service.
+func (s *Service) Config() *Config {
+	return s.internal.config
+}
+
 // AddAuthProvider initializes the authentication provider for the service.
 func (s *Service) AddAuthProvider(authProvider auth.AuthProvider) error {
 	var err error
