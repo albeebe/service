@@ -13,8 +13,10 @@ require (
 	github.com/gin-gonic/gin v1.10.0
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/golang-jwt/jwt/v5 v5.2.1
+	github.com/joho/godotenv v1.5.1
 	golang.org/x/net v0.29.0
 	golang.org/x/oauth2 v0.23.0
+	golang.org/x/sync v0.8.0
 	google.golang.org/api v0.199.0
 )
 
@@ -60,7 +62,6 @@ require (
 	go.opentelemetry.io/otel/trace v1.30.0 // indirect
 	golang.org/x/arch v0.8.0 // indirect
 	golang.org/x/crypto v0.27.0 // indirect
-	golang.org/x/sync v0.8.0 // indirect
 	golang.org/x/sys v0.25.0 // indirect
 	golang.org/x/text v0.18.0 // indirect
 	golang.org/x/time v0.6.0 // indirect

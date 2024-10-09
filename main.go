@@ -39,10 +39,10 @@ import (
 
 	"cloud.google.com/go/iam/credentials/apiv1/credentialspb"
 	"github.com/albeebe/service/internal/credentials"
-	"github.com/albeebe/service/internal/environment"
 	"github.com/albeebe/service/internal/logger"
 	"github.com/albeebe/service/internal/router"
 	"github.com/albeebe/service/pkg/auth"
+	"github.com/albeebe/service/pkg/environment"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -54,7 +54,7 @@ import (
 // configuration is incomplete and the service should not start until the issue
 // is resolved.
 func Initialize(spec interface{}) error {
-	return environment.Initialize(spec)
+	return environment.Initialize(spec, runningInProduction())
 }
 
 // New initializes a new service instance with a service name, and configuration.
