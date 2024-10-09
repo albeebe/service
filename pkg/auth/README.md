@@ -1,7 +1,4 @@
 # auth
-Here's the updated description:
-
----
 
 `auth` is a Go library providing robust authentication and authorization functionalities for HTTP services. It includes JWT validation, role and permission-based authorization, and automatic key and token refresh mechanisms. Additionally, the library provides middleware to make it easy for your services to make authenticated requests to other services, simplifying secure inter-service communication in distributed systems.
 
