@@ -20,13 +20,7 @@
 //
 // Created: September 30, 2024
 
-package credentials
-
-import "golang.org/x/oauth2/google"
-
-type Credentials struct {
-	GoogleCredentials *google.Credentials
-}
+package gcpcredentials
 
 type Config struct {
 	Scopes []string
@@ -35,6 +29,5 @@ type Config struct {
 // validate checks the Config struct for required fields and
 // returns an error if any required fields are missing
 func (c *Config) Validate() error {
-	//TODO: Need to implement
 	return nil
 }
