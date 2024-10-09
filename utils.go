@@ -33,8 +33,7 @@ import (
 	"strings"
 
 	"cloud.google.com/go/compute/metadata"
-	"github.com/albeebe/service/internal/router"
-	"github.com/gin-gonic/gin"
+	"github.com/albeebe/service/pkg/router"
 	"google.golang.org/api/idtoken"
 )
 
@@ -127,10 +126,10 @@ func runningInProduction() bool {
 }
 
 // sendResponse is a helper function that simplifies sending HTTP responses
-// in the Gin context with a given status code and message.
-func sendResponse(c *gin.Context, statusCode int, message string) {
+// with a given status code and message.
+func sendResponse(w http.ResponseWriter, statusCode int, message string) {
 	response := Text(statusCode, message)
-	router.SendResponse(c, response.StatusCode, response.Headers, response.Body)
+	router.SendResponse(w, response.StatusCode, response.Headers, response.Body)
 }
 
 // verifyGoogleRequest validates an incoming HTTP request by checking its Authorization

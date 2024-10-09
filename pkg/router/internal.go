@@ -18,33 +18,50 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 //
-// Created: September 30, 2024
+// Created: October 1, 2024
 
 package router
 
 import (
-	"context"
-	"fmt"
-	"net/http"
-
-	"github.com/gin-gonic/gin"
+	"errors"
+	"io"
+	"log"
+	"net"
+	"strings"
 )
 
-type Router struct {
-	ctx       context.Context
-	ginRouter *gin.Engine
-	server    *http.Server
-}
-
-type Config struct {
-	Host string
-}
-
-// validate checks the Config struct for required fields and
-// returns an error if any required fields are missing
-func (c *Config) Validate() error {
-	if c.Host == "" {
-		return fmt.Errorf("host is empty")
+// awaitContextDone waits for the context's cancellation or completion signal (ctx.Done()).
+// Once the context is done, it gracefully shuts down the router. If an error occurs during
+// the shutdown process, it logs the error message.
+func (r *Router) awaitContextDone() {
+	<-r.ctx.Done()
+	if err := r.Shutdown(); err != nil {
+		log.Printf("router failed to shutdown: %s", err.Error())
 	}
-	return nil
+}
+
+// isClientDisconnected checks if the given error is indicative of a client disconnection.
+func isClientDisconnected(err error) bool {
+
+	if err == nil {
+		return false
+	}
+
+	// Check for specific error types or error messages
+	if errors.Is(err, io.EOF) {
+		return true
+	}
+
+	// Handle common network errors that indicate client disconnection
+	if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+		return true
+	}
+
+	// Check error messages for common disconnection cases
+	errMsg := strings.ToLower(err.Error())
+	if strings.Contains(errMsg, "broken pipe") || strings.Contains(errMsg, "connection reset by peer") {
+		return true
+	}
+
+	return false
 }

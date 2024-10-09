@@ -39,12 +39,11 @@ import (
 
 	"cloud.google.com/go/iam/credentials/apiv1/credentialspb"
 	"github.com/albeebe/service/internal/logger"
-	"github.com/albeebe/service/internal/router"
 	"github.com/albeebe/service/pkg/auth"
 	"github.com/albeebe/service/pkg/environment"
 	"github.com/albeebe/service/pkg/gcpcredentials"
 	"github.com/albeebe/service/pkg/pubsub"
-	"github.com/gin-gonic/gin"
+	"github.com/albeebe/service/pkg/router"
 	"github.com/golang-jwt/jwt/v5"
 )
 
@@ -205,12 +204,12 @@ func (s *Service) AddAuthenticatedEndpoint(method, relativePath string, handler 
 
 	// Middleware to wrap the handler for request authentication. It authenticates the request,
 	// injects the relevant service into the handler, and manages the process of sending the response.
-	wrappedHandler := func(c *gin.Context) {
+	wrappedHandler := func(w http.ResponseWriter, r *http.Request) {
 		// Authenticate the request
-		authenticated, reason, err := s.internal.auth.Authenticate(c.Request)
+		authenticated, reason, err := s.internal.auth.Authenticate(r)
 		if err != nil {
 			s.Log.Errorf("failed to authenticated request: %w", err)
-			sendResponse(c, 500, "internal server error")
+			sendResponse(w, 500, "internal server error")
 			return
 		}
 		if !authenticated {
@@ -218,7 +217,7 @@ func (s *Service) AddAuthenticatedEndpoint(method, relativePath string, handler 
 			if reason != "" {
 				message += ": " + reason
 			}
-			sendResponse(c, 401, message)
+			sendResponse(w, 401, message)
 			return
 		}
 
@@ -228,31 +227,31 @@ func (s *Service) AddAuthenticatedEndpoint(method, relativePath string, handler 
 			requirements.AnyRole = append(requirements.AnyRole, r.AnyRole...)
 			requirements.AllPermissions = append(requirements.AllPermissions, r.AllPermissions...)
 		}
-		authorized, err := s.internal.auth.Authorize(c.Request, requirements)
+		authorized, err := s.internal.auth.Authorize(r, requirements)
 		if err != nil {
 			s.Log.Errorf("failed to authorize request: %w", err)
-			sendResponse(c, 500, "internal server error")
+			sendResponse(w, 500, "internal server error")
 			return
 		}
 		if !authorized {
-			sendResponse(c, 403, "forbidden")
+			sendResponse(w, 403, "forbidden")
 			return
 		}
 
 		// Send the request to the handler and handle the response
-		resp := handler(s, c.Request)
+		resp := handler(s, r)
 		if resp == nil {
-			sendResponse(c, 500, "internal server error")
+			sendResponse(w, 500, "internal server error")
 			return
 		}
-		if err := router.SendResponse(c, resp.StatusCode, resp.Headers, resp.Body); err != nil {
+		if err := router.SendResponse(w, resp.StatusCode, resp.Headers, resp.Body); err != nil {
 			s.Log.Errorf("failed to send response: %w", err)
 		}
 	}
 
 	// Register the wrapped handler to the router to handle requests on the given relativePath.
 	// Log a fatal error if the handler registration fails.
-	if err := s.internal.router.AddHandler(method, relativePath, wrappedHandler); err != nil {
+	if err := s.internal.router.RegisterHandler(method, relativePath, wrappedHandler); err != nil {
 		s.Log.Fatalf("failed to add endpoint [%s %s]: %w", method, relativePath, err)
 	}
 }
@@ -263,33 +262,33 @@ func (s *Service) AddAuthenticatedEndpoint(method, relativePath string, handler 
 func (s *Service) AddCloudTask(relativePath string, handler func(*Service, *http.Request) error) {
 
 	// wrappedHandler is the middleware that processes the incoming request.
-	wrappedHandler := func(c *gin.Context) {
+	wrappedHandler := func(w http.ResponseWriter, r *http.Request) {
 
 		// Verify the request if running in a production environment.
 		// This step ensures that the request comes from Google Cloud Tasks.
 		if runningInProduction() {
-			if err := verifyGoogleRequest(s.Context, c.Request); err != nil {
+			if err := verifyGoogleRequest(s.Context, r); err != nil {
 				// Respond with a 403 Forbidden status if verification fails.
-				sendResponse(c, http.StatusForbidden, "forbidden")
+				sendResponse(w, http.StatusForbidden, "forbidden")
 				return
 			}
 		}
 
 		// Invoke the provided handler function with the request.
 		// If the handler returns an error, log it and respond with a 500 Internal Server Error status.
-		if err := handler(s, c.Request); err != nil {
+		if err := handler(s, r); err != nil {
 			s.Log.Errorf("failed to handle request: %w", err)
-			sendResponse(c, http.StatusInternalServerError, "internal server error")
+			sendResponse(w, http.StatusInternalServerError, "internal server error")
 			return
 		}
 
 		// If the handler succeeds, respond with a 200 OK status.
-		sendResponse(c, http.StatusOK, "OK")
+		sendResponse(w, http.StatusOK, "OK")
 	}
 
 	// Register the wrapped handler to the router to handle POST requests on the given relativePath.
 	// Log a fatal error if the handler registration fails.
-	if err := s.internal.router.AddHandler("POST", relativePath, wrappedHandler); err != nil {
+	if err := s.internal.router.RegisterHandler("POST", relativePath, wrappedHandler); err != nil {
 		s.Log.Fatalf("failed to add Cloud Task [POST %s]: %w", relativePath, err)
 	}
 }
@@ -300,33 +299,33 @@ func (s *Service) AddCloudTask(relativePath string, handler func(*Service, *http
 func (s *Service) AddCronjob(relativePath string, handler func(*Service, *http.Request) error) {
 
 	// wrappedHandler is the middleware that processes the incoming request.
-	wrappedHandler := func(c *gin.Context) {
+	wrappedHandler := func(w http.ResponseWriter, r *http.Request) {
 
 		// Verify the request if running in a production environment.
 		// This step ensures that the request comes from Google Cloud Scheduler.
 		if runningInProduction() {
-			if err := verifyGoogleRequest(s.Context, c.Request); err != nil {
+			if err := verifyGoogleRequest(s.Context, r); err != nil {
 				// Respond with a 403 Forbidden status if verification fails.
-				sendResponse(c, http.StatusForbidden, "forbidden")
+				sendResponse(w, http.StatusForbidden, "forbidden")
 				return
 			}
 		}
 
 		// Invoke the provided handler function with the request.
 		// If the handler returns an error, log it and respond with a 500 Internal Server Error status.
-		if err := handler(s, c.Request); err != nil {
+		if err := handler(s, r); err != nil {
 			s.Log.Errorf("failed to handle request: %w", err)
-			sendResponse(c, http.StatusInternalServerError, "internal server error")
+			sendResponse(w, http.StatusInternalServerError, "internal server error")
 			return
 		}
 
 		// If the handler succeeds, respond with a 200 OK status.
-		sendResponse(c, http.StatusOK, "OK")
+		sendResponse(w, http.StatusOK, "OK")
 	}
 
 	// Register the wrapped handler to the router to handle POST requests on the given relativePath.
 	// Log a fatal error if the handler registration fails.
-	if err := s.internal.router.AddHandler("POST", relativePath, wrappedHandler); err != nil {
+	if err := s.internal.router.RegisterHandler("POST", relativePath, wrappedHandler); err != nil {
 		s.Log.Fatalf("failed to add Cloud Scheduler [POST %s]: %w", relativePath, err)
 	}
 }
@@ -340,19 +339,19 @@ func (s *Service) AddCronjob(relativePath string, handler func(*Service, *http.R
 func (s *Service) AddPublicEndpoint(method, relativePath string, handler func(*Service, *http.Request) *HTTPResponse) {
 
 	// Wrap the handler, so we can pass the service to it and handle sending the response
-	wrappedHandler := func(c *gin.Context) {
-		resp := handler(s, c.Request)
+	wrappedHandler := func(w http.ResponseWriter, r *http.Request) {
+		resp := handler(s, r)
 		if resp == nil {
 			resp = Text(500, "internal server error")
 		}
-		if err := router.SendResponse(c, resp.StatusCode, resp.Headers, resp.Body); err != nil {
+		if err := router.SendResponse(w, resp.StatusCode, resp.Headers, resp.Body); err != nil {
 			s.Log.Errorf("failed to send response: %w", err)
 		}
 	}
 
 	// Register the wrapped handler to the router to handle requests on the given relativePath.
 	// Log a fatal error if the handler registration fails.
-	if err := s.internal.router.AddHandler(method, relativePath, wrappedHandler); err != nil {
+	if err := s.internal.router.RegisterHandler(method, relativePath, wrappedHandler); err != nil {
 		s.Log.Fatalf("failed to add endpoint [%s %s]: %w", method, relativePath, err)
 	}
 }
@@ -366,12 +365,12 @@ func (s *Service) AddServiceEndpoint(method, relativePath string, handler func(*
 
 	// Middleware to wrap the handler for request authentication. It authenticates the request,
 	// injects the relevant service into the handler, and manages the process of sending the response.
-	wrappedHandler := func(c *gin.Context) {
+	wrappedHandler := func(w http.ResponseWriter, r *http.Request) {
 		// Authenticate the request
-		authenticated, reason, err := s.internal.auth.Authenticate(c.Request)
+		authenticated, reason, err := s.internal.auth.Authenticate(r)
 		if err != nil {
 			s.Log.Errorf("failed to authenticated request: %w", err)
-			sendResponse(c, 500, "internal server error")
+			sendResponse(w, 500, "internal server error")
 			return
 		}
 		if !authenticated {
@@ -379,30 +378,30 @@ func (s *Service) AddServiceEndpoint(method, relativePath string, handler func(*
 			if reason != "" {
 				message += ": " + reason
 			}
-			sendResponse(c, 401, message)
+			sendResponse(w, 401, message)
 			return
 		}
 
 		// Verify the request is from a service
-		if isVerified := s.internal.auth.IsServiceRequest(c.Request); !isVerified {
-			sendResponse(c, 403, "forbidden: restricted to services")
+		if isVerified := s.internal.auth.IsServiceRequest(r); !isVerified {
+			sendResponse(w, 403, "forbidden: restricted to services")
 			return
 		}
 
 		// Send the request to the handler and handle the response
-		resp := handler(s, c.Request)
+		resp := handler(s, r)
 		if resp == nil {
-			sendResponse(c, 501, "internal server error")
+			sendResponse(w, 501, "internal server error")
 			return
 		}
-		if err := router.SendResponse(c, resp.StatusCode, resp.Headers, resp.Body); err != nil {
+		if err := router.SendResponse(w, resp.StatusCode, resp.Headers, resp.Body); err != nil {
 			s.Log.Errorf("failed to send response: %w", err)
 		}
 	}
 
 	// Register the wrapped handler to the router to handle requests on the given relativePath.
 	// Log a fatal error if the handler registration fails.
-	if err := s.internal.router.AddHandler(method, relativePath, wrappedHandler); err != nil {
+	if err := s.internal.router.RegisterHandler(method, relativePath, wrappedHandler); err != nil {
 		s.Log.Fatalf("failed to add endpoint [%s %s]: %w", method, relativePath, err)
 	}
 }
@@ -414,14 +413,14 @@ func (s *Service) AddServiceEndpoint(method, relativePath string, handler func(*
 func (s *Service) AddPubSubEndpoint(relativePath string, handler func(*Service, PubSubMessage) error) {
 
 	// wrappedHandler is the middleware that processes the incoming request.
-	wrappedHandler := func(c *gin.Context) {
+	wrappedHandler := func(w http.ResponseWriter, r *http.Request) {
 
 		// Verify the request if running in a production environment.
 		// This step ensures that the request comes from Google Pub/Sub.
 		if runningInProduction() {
-			if err := pubsub.ValidateGooglePubSubRequest(s.Context, c.Request, ""); err != nil {
+			if err := pubsub.ValidateGooglePubSubRequest(s.Context, r, ""); err != nil {
 				// Respond with a 403 Forbidden status if verification fails.
-				sendResponse(c, http.StatusForbidden, "forbidden")
+				sendResponse(w, http.StatusForbidden, "forbidden")
 				return
 			}
 		}
@@ -436,10 +435,10 @@ func (s *Service) AddPubSubEndpoint(relativePath string, handler func(*Service, 
 		}
 		var envelope Envelope
 
-		// If the JSON binding fails, log the error and respond with a 400 Bad Request status.
-		if err := c.BindJSON(&envelope); err != nil {
+		// If the JSON unmarshalling fails, log the error and respond with a 400 Bad Request status.
+		if err := UnmarshalJSONBody(r, &envelope); err != nil {
 			s.Log.Errorf("failed to decode message envelope: %w", err)
-			sendResponse(c, http.StatusBadRequest, "bad request")
+			sendResponse(w, http.StatusBadRequest, "bad request")
 			return
 		}
 
@@ -455,7 +454,7 @@ func (s *Service) AddPubSubEndpoint(relativePath string, handler func(*Service, 
 		// If data decoding fails, log the error and respond with a 400 Bad Request status.
 		if err != nil {
 			s.Log.Errorf("failed to decode message data: %w", err)
-			sendResponse(c, http.StatusBadRequest, "bad request")
+			sendResponse(w, http.StatusBadRequest, "bad request")
 			return
 		}
 
@@ -463,17 +462,17 @@ func (s *Service) AddPubSubEndpoint(relativePath string, handler func(*Service, 
 		// If the handler returns an error, log it and respond with a 500 Internal Server Error status.
 		if err := handler(s, message); err != nil {
 			s.Log.Errorf("failed to handle message: %w", err)
-			sendResponse(c, http.StatusInternalServerError, "internal server error")
+			sendResponse(w, http.StatusInternalServerError, "internal server error")
 			return
 		}
 
 		// If the handler succeeds, respond with a 200 OK status.
-		sendResponse(c, http.StatusOK, "OK")
+		sendResponse(w, http.StatusOK, "OK")
 	}
 
 	// Register the wrapped handler to the router to handle POST requests on the given relativePath.
 	// Log a fatal error if the handler registration fails.
-	if err := s.internal.router.AddHandler("POST", relativePath, wrappedHandler); err != nil {
+	if err := s.internal.router.RegisterHandler("POST", relativePath, wrappedHandler); err != nil {
 		s.Log.Fatalf("failed to add PubSub [POST %s]: %w", relativePath, err)
 	}
 }

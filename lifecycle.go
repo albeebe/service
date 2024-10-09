@@ -26,6 +26,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net/http"
 	"sync"
 	"time"
 
@@ -33,8 +34,8 @@ import (
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	credentials "cloud.google.com/go/iam/credentials/apiv1"
 	"cloud.google.com/go/storage"
-	"github.com/albeebe/service/internal/router"
 	"github.com/albeebe/service/pkg/pubsub"
+	"github.com/albeebe/service/pkg/router"
 	"google.golang.org/api/option"
 )
 
@@ -145,8 +146,22 @@ func (s *Service) setupPubSub() (err error) {
 
 // setupRouter initializes the HTTP router for the service.
 func (s *Service) setupRouter() (err error) {
+
+	noRouteHandler := func(w http.ResponseWriter, r *http.Request) {
+		sendResponse(w, http.StatusNotFound, "not found")
+	}
+
 	s.internal.router, err = router.NewRouter(s.Context, router.Config{
-		Host: s.internal.config.Host,
+		Host:           s.internal.config.Host,
+		NoRouteHandler: &noRouteHandler,
+		Cors: &router.Cors{
+			AllowOrigins:     []string{"*"},
+			AllowMethods:     []string{"*"},
+			AllowHeaders:     []string{"*"},
+			ExposeHeaders:    []string{"*"},
+			AllowCredentials: true,
+			MaxAge:           time.Hour,
+		},
 	})
 	return err
 }

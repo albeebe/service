@@ -15,3 +15,6 @@ Simplifies the process of obtaining and managing Google Cloud credentials. It pr
 
 ### 4. [pubsub](pubsub)
 Simplifies interacting with Google Cloud Pub/Sub.. It enables publishing messages to Pub/Sub topics, managing topics efficiently, and validating incoming Google Pub/Sub HTTP requests with token authentication.
+
+### 4. [router](router)
+Provides an HTTP/2-enabled router with CORS support and a customizable 404 handler. The package leverages the [Gin framework](https://gin-gonic.com/) internally to handle routing and middleware. However, Gin is not exposed externally, which allows for the easy replacement of the underlying framework in the future without affecting the external API of the package.
