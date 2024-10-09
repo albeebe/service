@@ -128,7 +128,7 @@ func loadDotEnvFile() error {
 // values. Each field must have a "default" tag specifying the default value. The
 // function assigns the default value to the field based on its type.
 //
-// Supported types include: bool, float64, int64, int, and string.
+// Supported types include: bool, float64, int64, and string.
 // For each type, the function parses the default value (a string from the tag)
 // into the appropriate type and assigns it to the field.
 //
