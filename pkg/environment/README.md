@@ -4,10 +4,14 @@
 
 ## Features
 
-- **Seamless Integration for Local and Production Environments**: In production, missing environment variables return an error, while in local environments, users are prompted for missing values and can either provide their own values or use defaults.
-- **Automatic Struct Population**: Automatically populates a provided struct with environment variable values.
-- **Type Safety**: Supports multiple types (`bool`, `float64`, `int64`, `string`), ensuring that values are correctly typed and validated.
-- **.env File Support**: Automatically loads environment variables from a `.env` file if available.
+- **Seamless Integration for Local and Production Environments**
+  - In production, missing environment variables return an error, while in local environments, users are prompted for missing values and can either provide their own values or use defaults.
+- **Automatic Struct Population**
+  - Automatically populates a provided struct with environment variable values.
+- **Type Safety**
+  - Supports multiple types (`bool`, `float64`, `int64`, `string`), ensuring that values are correctly typed and validated.
+- **.env File Support**
+  - Automatically loads environment variables from a `.env` file if available.
 
 ## Installation
 
@@ -46,7 +50,7 @@ import (
 
 func main() {
     var envVars EnvVars
-	runningInProduction := metadata.OnGCE()
+    runningInProduction := metadata.OnGCE()
     err := environment.Initialize(&envVars, runningInProduction)
     if err != nil {
         fmt.Printf("Error initializing environment: %v\n", err)
