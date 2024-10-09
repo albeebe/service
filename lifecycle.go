@@ -33,8 +33,8 @@ import (
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	credentials "cloud.google.com/go/iam/credentials/apiv1"
 	"cloud.google.com/go/storage"
-	"github.com/albeebe/service/internal/pubsub"
 	"github.com/albeebe/service/internal/router"
+	"github.com/albeebe/service/pkg/pubsub"
 	"google.golang.org/api/option"
 )
 

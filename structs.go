@@ -34,9 +34,9 @@ import (
 	credentials "cloud.google.com/go/iam/credentials/apiv1"
 	"cloud.google.com/go/storage"
 	"github.com/albeebe/service/internal/logger"
-	"github.com/albeebe/service/internal/pubsub"
 	"github.com/albeebe/service/internal/router"
 	"github.com/albeebe/service/pkg/auth"
+	"github.com/albeebe/service/pkg/pubsub"
 	"golang.org/x/oauth2/google"
 )
 

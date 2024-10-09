@@ -24,6 +24,7 @@ package pubsub
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	ps "cloud.google.com/go/pubsub"
@@ -46,6 +47,9 @@ type Config struct {
 // validate checks the Config struct for required fields and
 // returns an error if any required fields are missing
 func (c *Config) Validate() error {
-	//TODO: Need to implement
+
+	if c.GCPProjectID == "" {
+		return fmt.Errorf("GCPProjectID is empty")
+	}
 	return nil
 }

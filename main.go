@@ -43,6 +43,7 @@ import (
 	"github.com/albeebe/service/pkg/auth"
 	"github.com/albeebe/service/pkg/environment"
 	"github.com/albeebe/service/pkg/gcpcredentials"
+	"github.com/albeebe/service/pkg/pubsub"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -406,11 +407,11 @@ func (s *Service) AddServiceEndpoint(method, relativePath string, handler func(*
 	}
 }
 
-// AddPubSub registers a new POST endpoint at the specified relativePath to handle incoming
+// AddPubSubEndpoint registers a new POST endpoint at the specified relativePath to handle incoming
 // Pub/Sub messages. In production, it verifies the authenticity of the request, while in
 // local or non-production environments, request verification is skipped. The function
 // decodes the Pub/Sub message and invokes the provided handler function with the decoded message.
-func (s *Service) AddPubSub(relativePath string, handler func(*Service, PubSubMessage) error) {
+func (s *Service) AddPubSubEndpoint(relativePath string, handler func(*Service, PubSubMessage) error) {
 
 	// wrappedHandler is the middleware that processes the incoming request.
 	wrappedHandler := func(c *gin.Context) {
@@ -418,7 +419,7 @@ func (s *Service) AddPubSub(relativePath string, handler func(*Service, PubSubMe
 		// Verify the request if running in a production environment.
 		// This step ensures that the request comes from Google Pub/Sub.
 		if runningInProduction() {
-			if err := verifyGoogleRequest(s.Context, c.Request); err != nil {
+			if err := pubsub.ValidateGooglePubSubRequest(s.Context, c.Request, ""); err != nil {
 				// Respond with a 403 Forbidden status if verification fails.
 				sendResponse(c, http.StatusForbidden, "forbidden")
 				return

@@ -27,8 +27,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/url"
+	"strings"
 
 	ps "cloud.google.com/go/pubsub"
+	"google.golang.org/api/idtoken"
 )
 
 // New creates a new PubSub instance, initializing the Pub/Sub client.
@@ -99,6 +103,47 @@ func (p *PubSub) Publish(topic string, message interface{}) (string, error) {
 		return "", fmt.Errorf("failed to publish message: %w", err)
 	}
 	return msgID, nil
+}
+
+// ValidateGooglePubSubRequest validates an incoming HTTP request from Google Pub/Sub
+// by checking its Authorization header for a Bearer token. It ensures that the token
+// is well-formed, verifies it using Google's ID token validation, and optionally
+// compares the token's audience with a provided audience string. If no audience is
+// provided, the request's host and path are compared to the audience in the token.
+// Returns an error if any validation step fails.
+func ValidateGooglePubSubRequest(ctx context.Context, r *http.Request, audience string) error {
+
+	// Extract the Authorization header and ensure it contains a Bearer token.
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" || !strings.HasPrefix(strings.ToLower(authHeader), "bearer ") {
+		return fmt.Errorf("missing or malformed authorization header")
+	}
+
+	// Remove the "Bearer " prefix and trim any surrounding whitespace.
+	token := strings.TrimSpace(authHeader[7:])
+	if token == "" {
+		return fmt.Errorf("authorization header contains no token")
+	}
+
+	// Validate the ID token using Google's token validation method.
+	payload, err := idtoken.Validate(ctx, token, audience)
+	if err != nil {
+		return fmt.Errorf("token validation failed: %w", err)
+	}
+
+	// If no audience is provided, verify the token's audience matches the request's host and path.
+	if audience == "" {
+		audienceURL, err := url.Parse(payload.Audience)
+		if err != nil {
+			return fmt.Errorf("failed to parse token audience: %w", err)
+		}
+		// Ensure the host and path in the request match the token audience's host and path.
+		if r.Host != audienceURL.Host || r.URL.Path != audienceURL.Path {
+			return fmt.Errorf("request host and path do not match token audience")
+		}
+	}
+
+	return nil
 }
 
 // serializeMessage converts the message to a byte slice based on its type.
