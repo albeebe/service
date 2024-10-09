@@ -26,11 +26,12 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"github.com/joho/godotenv"
 	"os"
 	"reflect"
 	"strconv"
 	"strings"
+
+	"github.com/joho/godotenv"
 )
 
 const (
