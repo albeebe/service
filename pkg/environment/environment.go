@@ -52,21 +52,24 @@ const (
 // where the user is given the choice to either use the default or provide their own value.
 //
 // Behavior:
-//   - In local environments:
-//   - If any required environment variables are missing or unset (excluding string fields, where empty values are permitted),
-//     the user will be prompted to either accept the default value or input their own value.
-//   - The user-provided or default values are saved in a ".env" file for future runs.
-//   - After prompting, the application will terminate to allow a fresh run with the new environment settings.
-//   - In production environments:
-//   - If any required environment variables are missing or unset (excluding string fields, where empty values are allowed),
-//     the function will return an error. Empty values are considered missing for non-string types (e.g., bool, int64, etc.).
+//
+//	In local environments:
+//	- If any required environment variables are missing or unset (excluding string fields, where empty values are permitted),
+//	  the user will be prompted to either accept the default value or input their own value.
+//	- The user-provided or default values are saved in a ".env" file for future runs.
+//	- After prompting, the application will terminate to allow a fresh run with the new environment settings.
+//
+//	In production environments:
+//	- If any required environment variables are missing or unset (excluding string fields, where empty values are allowed),
+//	  the function will return an error. Empty values are considered missing for non-string types (e.g., bool, int64, etc.).
 //
 // Returns:
-//   - An error if:
-//   - The passed struct is not a pointer.
-//   - Required environment variables are missing in production (excluding empty strings).
-//   - Any required `default` tags are missing.
-//   - An unexpected error occurs during the process (e.g., issues reflecting the struct or reading from the environment).
+//
+//	An error if:
+//	- The passed struct is not a pointer.
+//	- Required environment variables are missing in production (excluding empty strings).
+//	- Any required `default` tags are missing.
+//	- An unexpected error occurs during the process (e.g., issues reflecting the struct or reading from the environment).
 func Initialize(spec interface{}, runningInProduction bool) error {
 
 	// Ensure that the passed value is a pointer to a struct
