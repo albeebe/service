@@ -263,10 +263,10 @@ func (s *Service) AddAuthenticatedEndpoint(method, relativePath string, handler 
 	}
 }
 
-// AddCloudTask registers a new POST endpoint at the specified relativePath to handle
+// AddCloudTaskEndpoint registers a new POST endpoint at the specified relativePath to handle
 // incoming Google Cloud Tasks. In production, it verifies the authenticity of the request,
 // while in local or non-production environments, request verification is skipped.
-func (s *Service) AddCloudTask(relativePath string, handler func(*Service, *http.Request) error) {
+func (s *Service) AddCloudTaskEndpoint(relativePath string, handler func(*Service, *http.Request) error) {
 
 	// wrappedHandler is the middleware that processes the incoming request.
 	wrappedHandler := func(w http.ResponseWriter, r *http.Request) {
@@ -300,10 +300,10 @@ func (s *Service) AddCloudTask(relativePath string, handler func(*Service, *http
 	}
 }
 
-// AddCronjob registers a new POST endpoint at the specified relativePath to handle
+// AddCloudSchedulerEndpoint registers a new POST endpoint at the specified relativePath to handle
 // incoming Google Cloud Scheduler requests. In production, it verifies the authenticity of the
 // request, while in local or non-production environments, request verification is skipped.
-func (s *Service) AddCronjob(relativePath string, handler func(*Service, *http.Request) error) {
+func (s *Service) AddCloudSchedulerEndpoint(relativePath string, handler func(*Service, *http.Request) error) {
 
 	// wrappedHandler is the middleware that processes the incoming request.
 	wrappedHandler := func(w http.ResponseWriter, r *http.Request) {
@@ -366,7 +366,22 @@ func (s *Service) AddPublicEndpoint(method, relativePath string, handler func(*S
 	}
 }
 
-func (s *Service) AddServiceEndpoint(method, relativePath string, handler func(*Service, *http.Request) *HTTPResponse) {
+// AddServiceEndpoint registers an HTTP endpoint that requires authentication and is restricted to service requests only.
+// It first authenticates the request, ensuring that only valid credentials are allowed, and then verifies
+// that the request comes specifically from a trusted service before invoking the handler.
+//
+// If the service was initialized without an AuthProvider, it logs a fatal error and exits.
+// If authentication fails, a 401 Unauthorized response is returned. If the request is not verified as coming
+// from a service, a 403 Forbidden response is returned indicating that access is restricted to services.
+//
+// Optionally, authorization requirements (roles or permissions) can be specified and are checked after
+// authentication. If the authorization requirements are not met, a 403 Forbidden response is returned.
+//
+// The handler function receives the Service instance and the HTTP request, and returns an HTTPResponse.
+// In case of an internal error during processing, a 500 Internal Server Error is returned.
+// This endpoint is intended for use by other services and ensures only authenticated and verified service requests
+// are permitted.
+func (s *Service) AddServiceEndpoint(method, relativePath string, handler func(*Service, *http.Request) *HTTPResponse, authRequirements ...auth.AuthRequirements) {
 
 	// Confirm an AuthProvider exists
 	if s.internal.auth == nil {
@@ -396,6 +411,23 @@ func (s *Service) AddServiceEndpoint(method, relativePath string, handler func(*
 		// Verify the request is from a service
 		if isVerified := s.internal.auth.IsServiceRequest(r); !isVerified {
 			sendResponse(w, 403, "forbidden: restricted to services")
+			return
+		}
+
+		// Authorize the request
+		requirements := auth.AuthRequirements{}
+		for _, r := range authRequirements {
+			requirements.AnyRole = append(requirements.AnyRole, r.AnyRole...)
+			requirements.AllPermissions = append(requirements.AllPermissions, r.AllPermissions...)
+		}
+		authorized, err := s.internal.auth.Authorize(r, requirements)
+		if err != nil {
+			s.Log.Error("failed to authorize request", slog.Any("error", err))
+			sendResponse(w, 500, "internal server error")
+			return
+		}
+		if !authorized {
+			sendResponse(w, 403, "forbidden")
 			return
 		}
 
