@@ -35,10 +35,35 @@ import (
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	credentials "cloud.google.com/go/iam/credentials/apiv1"
 	"cloud.google.com/go/storage"
+	"github.com/albeebe/service/pkg/logger"
 	"github.com/albeebe/service/pkg/pubsub"
 	"github.com/albeebe/service/pkg/router"
 	"google.golang.org/api/option"
 )
+
+// initializeLogger sets up the structured logger for the service, configuring it based on the environment.
+// In production, it uses Google Cloud Logging with the Info level to capture operational logs.
+// In development, it defaults to a local console logger with the Debug level for more verbose output.
+func (s *Service) initializeLogger() error {
+	var err error
+
+	// Choose logger configuration based on the environment
+	if runningInProduction() {
+		// Set up Google Cloud logging for production
+		s.Log, err = logger.NewGoogleCloudLogger(s.Context, logger.Config{
+			GCPProjectID: s.internal.config.GCPProjectID,
+			LogName:      "service-log",
+			Level:        slog.LevelInfo, // Use Info level for production
+		})
+	} else {
+		// Set up development logging for non-production environments
+		s.Log, err = logger.NewDevelopmentLogger(s.Context, logger.Config{
+			Level: slog.LevelDebug, // Use Debug level for development
+		})
+	}
+
+	return err
+}
 
 // setup initializes various components of the service concurrently to enhance performance.
 func (s *Service) setup() error {
@@ -195,6 +220,7 @@ func (s *Service) teardown(timeout time.Duration) error {
 	}
 	components := []Component{
 		{"Cloud SQL", s.teardownCloudSQL},
+		{"Logger", s.teardownLogger},
 		{"Router", s.teardownRouter},
 	}
 
@@ -253,6 +279,18 @@ func (s *Service) teardownCloudSQL() (err error) {
 			return err
 		}
 		s.DB = nil
+	}
+	return nil
+}
+
+// teardownLogger ensures that all pending log entries are flushed to their destination
+// (such as Google Cloud Logging) before shutting down the logger.
+func (s *Service) teardownLogger() (err error) {
+	if s.Log != nil {
+		if err := logger.FlushLogger(s.Log); err != nil {
+			return err
+		}
+		s.Log = nil
 	}
 	return nil
 }

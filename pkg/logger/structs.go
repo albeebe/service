@@ -23,34 +23,26 @@
 package logger
 
 import (
-	"fmt"
+	"log/slog"
 
 	"cloud.google.com/go/logging"
 )
 
-// Config holds configuration details
+// Config holds configuration details for setting up logging.
 type Config struct {
-	GCPProjectID string
-	Production   bool
-	LogName      string
+	GCPProjectID string     // GCPProjectID is the Google Cloud Project ID where logs will be sent.
+	LogName      string     // LogName is the name of the log stream where entries will be written.
+	Level        slog.Level // Level is the minimum log level that will be captured (e.g., DEBUG, INFO).
 }
 
-// Custom Google Cloud Logging handler for slog
+// DevelopmentHandler is a custom handler for slog used in development environments.
+// It outputs logs to the console with formatted messages and structured data.
+type DevelopmentHandler struct {
+	level slog.Level // Level is the minimum log level at which logs will be printed to the console.
+}
+
+// GoogleCloudLoggingHandler is a custom handler for slog used to send logs to Google Cloud Logging.
 type GoogleCloudLoggingHandler struct {
-	logger *logging.Logger
-}
-
-// validate checks the Config struct for required fields and
-// returns an error if any required fields are missing
-func (c *Config) Validate() error {
-
-	if c.GCPProjectID == "" {
-		return fmt.Errorf("GCPProjectID is empty")
-	}
-
-	if c.LogName == "" {
-		return fmt.Errorf("LogName is empty")
-	}
-
-	return nil
+	logger *logging.Logger // Logger is the Google Cloud Logger instance used to send log entries.
+	level  slog.Level      // Level is the minimum log level at which logs will be sent to Google Cloud.
 }

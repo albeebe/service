@@ -29,30 +29,75 @@ import (
 	"cloud.google.com/go/logging"
 )
 
-// Enabled checks if the log level is enabled for this handler.
+// Enabled reports whether the provided log level is enabled for this handler.
 func (h *GoogleCloudLoggingHandler) Enabled(_ context.Context, level slog.Level) bool {
-	// Only log if the level is equal to or higher than the handler's log level
-	return true
+	// Returns true if the log level is equal to or higher than the handler's log level.
+	return level >= h.level
 }
 
-// Implement the slog.Handler interface
+// Handle processes a slog.Record by converting it into a Google Cloud Logging entry.
+// It extracts the log message and any associated structured attributes (key-value pairs),
+// maps the slog log level to Google Cloud Logging severity, and forwards the log entry
+// to Google Cloud Logging.
 func (h *GoogleCloudLoggingHandler) Handle(ctx context.Context, r slog.Record) error {
-	// Convert slog.Record to a Google Cloud log entry
+	// Create a map to hold the structured data (attributes)
+	attributes := make(map[string]interface{})
+
+	// Collect attributes from slog.Record
+	r.Attrs(func(a slog.Attr) bool {
+		attributes[a.Key] = a.Value
+		return true // Continue iterating over all attributes
+	})
+
+	// Create a Google Cloud Logging entry with the log message and structured data
 	entry := logging.Entry{
-		Severity: logging.Info, // Map slog levels to Google Cloud severity levels
-		Payload:  r.Message,    // Use slog's message
+		Severity: h.mapSeverity(r.Level), // Map slog levels to Google Cloud severity levels
+		Payload: map[string]interface{}{
+			"message":    r.Message,  // Add the message as part of the payload
+			"attributes": attributes, // Add structured data as part of the payload
+		},
 	}
 
-	h.logger.Log(entry) // Forward the log entry to Google Cloud Logging
+	// Log the entry to Google Cloud
+	h.logger.Log(entry)
 	return nil
 }
 
+// WithAttrs is required to satisfy the slog.Handler interface.
+// This method would typically return a new handler with additional attributes,
+// but since attribute handling is not needed, it returns the original handler unchanged.
 func (h *GoogleCloudLoggingHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
-	// Customize as needed
+	// Returning the handler unchanged, as attribute handling is not required.
 	return h
 }
 
+// WithGroup is required to satisfy the slog.Handler interface.
+// This method would typically return a new handler that groups log attributes,
+// but since grouping is not needed, it returns the original handler unchanged.
 func (h *GoogleCloudLoggingHandler) WithGroup(name string) slog.Handler {
-	// Customize as needed
+	// Returning the handler unchanged, as log grouping is not required.
 	return h
+}
+
+// Flush sends any buffered log entries to Google Cloud Logging and waits for all logs
+// to be fully processed. It ensures that logs are properly flushed before shutting down
+// the service or completing operations that depend on log delivery.
+func (h *GoogleCloudLoggingHandler) Flush() error {
+	return h.logger.Flush()
+}
+
+// mapSeverity maps slog levels to Google Cloud Logging severity levels
+func (h *GoogleCloudLoggingHandler) mapSeverity(level slog.Level) logging.Severity {
+	switch level {
+	case slog.LevelDebug:
+		return logging.Debug
+	case slog.LevelInfo:
+		return logging.Info
+	case slog.LevelWarn:
+		return logging.Warning
+	case slog.LevelError:
+		return logging.Error
+	default:
+		return logging.Default
+	}
 }

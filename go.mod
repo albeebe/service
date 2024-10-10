@@ -7,6 +7,7 @@ require (
 	cloud.google.com/go/cloudtasks v1.13.1
 	cloud.google.com/go/compute/metadata v0.5.2
 	cloud.google.com/go/iam v1.2.1
+	cloud.google.com/go/logging v1.11.0
 	cloud.google.com/go/storage v1.43.0
 	github.com/albeebe/service/pkg/auth v0.0.0-20241009172118-934e0d4f6b20
 	github.com/albeebe/service/pkg/environment v0.0.0-20241009172118-934e0d4f6b20
@@ -24,6 +25,7 @@ require (
 	cloud.google.com/go v0.115.1 // indirect
 	cloud.google.com/go/auth v0.9.6 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.4 // indirect
+	cloud.google.com/go/longrunning v0.6.1 // indirect
 	cloud.google.com/go/pubsub v1.44.0 // indirect
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/bytedance/sonic v1.11.6 // indirect

@@ -42,7 +42,6 @@ import (
 	"github.com/albeebe/service/pkg/auth"
 	"github.com/albeebe/service/pkg/environment"
 	"github.com/albeebe/service/pkg/gcpcredentials"
-	"github.com/albeebe/service/pkg/logger"
 	"github.com/albeebe/service/pkg/pubsub"
 	"github.com/albeebe/service/pkg/router"
 	"github.com/golang-jwt/jwt/v5"
@@ -79,18 +78,14 @@ func New(serviceName string, config Config) (*Service, error) {
 		},
 	}
 
-	// Configure the logger
-	var err error
-	s.Log, err = logger.NewGoogleCloudLogging(logger.Config{
-		GCPProjectID: config.GCPProjectID,
-		Production:   runningInProduction(),
-		LogName:      "service-log",
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to configure logger: %w", err)
+	// Initialize the logger
+	if err := s.initializeLogger(); err != nil {
+		return nil, fmt.Errorf("failed to initialize logger: %w", err)
 	}
 
+	s.Log.Error("Just testing an error", slog.Any("error", errors.New("My Error")))
 	// Load the credentials
+	var err error
 	s.GoogleCredentials, err = gcpcredentials.NewCredentials(ctx, gcpcredentials.Config{
 		Scopes: []string{
 			"https://www.googleapis.com/auth/cloud-platform",

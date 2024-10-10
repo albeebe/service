@@ -24,34 +24,81 @@ package logger
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 
 	"cloud.google.com/go/logging"
 )
 
-func NewGoogleCloudLogging(config Config) (*slog.Logger, error) {
-
-	// Validate the provided configuration
-	if err := config.Validate(); err != nil {
-		return nil, fmt.Errorf("invalid config: %w", err)
+// NewDevelopmentLogger sets up a logger for development environments using a custom slog handler.
+// This logger prints log entries to the console in a human-readable format. It includes:
+// - Timestamps with millisecond precision.
+// - Log levels (DEBUG, INFO, WARN, ERROR) in brackets for easy identification.
+// - The log message itself.
+// - Structured key-value data (attributes) when provided, appended after the message.
+// - For ERROR-level logs, a stack trace is included, showing the file and line number of the error origin.
+// This logging setup is useful for local development as it makes it easier to spot issues,
+// read structured data, and debug errors directly from the console output.
+func NewDevelopmentLogger(ctx context.Context, config Config) (*slog.Logger, error) {
+	// Create a custom slog handler for development logging
+	handler := &DevelopmentHandler{
+		level: config.Level, // Set the logging level based on the provided config
 	}
 
-	// Initialize Google Cloud Logging client
-	client, err := logging.NewClient(context.Background(), config.GCPProjectID)
+	// Return a new slog.Logger using the custom development handler
+	return slog.New(handler), nil
+}
+
+// NewGoogleCloudLogger sets up a logger for Google Cloud Logging.
+// It validates the provided configuration, initializes a Google Cloud Logging client,
+// creates a custom slog handler for Google Cloud Logging, and returns an slog.Logger.
+func NewGoogleCloudLogger(ctx context.Context, config Config) (*slog.Logger, error) {
+	// Validate the provided configuration
+	if config.GCPProjectID == "" {
+		return nil, errors.New("GCP project ID is missing in config")
+	}
+	if config.LogName == "" {
+		return nil, errors.New("log name is missing in config")
+	}
+
+	// Initialize Google Cloud Logging client with the provided context
+	client, err := logging.NewClient(ctx, config.GCPProjectID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Google Cloud Logging client: %w", err)
 	}
 
-	// Create a logger for writing logs
+	// Create a Google Cloud logger with the specified log name
 	googleLogger := client.Logger(config.LogName)
 
 	// Create a custom slog handler for Google Cloud Logging
-	gclHandler := &GoogleCloudLoggingHandler{
+	handler := &GoogleCloudLoggingHandler{
 		logger: googleLogger,
+		level:  config.Level, // Set the logging level based on the provided config
 	}
 
-	// Set up slog with the custom Google Cloud Logging handler
-	logger := slog.New(gclHandler)
-	return logger, nil
+	// Return a new slog.Logger using the custom Google Cloud Logging handler
+	return slog.New(handler), nil
+}
+
+// FlushLogger attempts to flush the logs for the provided slog.Logger.
+// It supports flushing for loggers using either GoogleCloudLoggingHandler or DevelopmentHandler.
+// If the logger does not support flushing, an error is returned.
+func FlushLogger(l *slog.Logger) error {
+	if l == nil {
+		return errors.New("logger is nil")
+	}
+
+	// Attempt to flush if the handler is GoogleCloudLoggingHandler
+	if handler, ok := l.Handler().(*GoogleCloudLoggingHandler); ok {
+		return handler.Flush()
+	}
+
+	// Attempt to flush if the handler is DevelopmentHandler
+	if handler, ok := l.Handler().(*DevelopmentHandler); ok {
+		return handler.Flush()
+	}
+
+	// Return an error because the logger does not support flushing
+	return errors.New("logger does not support flushing")
 }

@@ -1,6 +1,6 @@
 # router
 
-`router` is a Go package that provides an HTTP/2-enabled router with CORS support and a customizable 404 handler. The package leverages the [Gin framework](https://gin-gonic.com/) internally to handle routing and middleware. However, Gin is not exposed externally, which allows for the easy replacement of the underlying framework in the future without affecting the external API of the package.
+`router` is a Go library that provides an HTTP/2-enabled router with CORS support and a customizable 404 handler. The package leverages the [Gin framework](https://gin-gonic.com/) internally to handle routing and middleware. However, Gin is not exposed externally, which allows for the easy replacement of the underlying framework in the future without affecting the external API of the package.
 
 ## Features
 
