@@ -29,6 +29,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -38,10 +39,10 @@ import (
 	"time"
 
 	"cloud.google.com/go/iam/credentials/apiv1/credentialspb"
-	"github.com/albeebe/service/internal/logger"
 	"github.com/albeebe/service/pkg/auth"
 	"github.com/albeebe/service/pkg/environment"
 	"github.com/albeebe/service/pkg/gcpcredentials"
+	"github.com/albeebe/service/pkg/logger"
 	"github.com/albeebe/service/pkg/pubsub"
 	"github.com/albeebe/service/pkg/router"
 	"github.com/golang-jwt/jwt/v5"
@@ -72,15 +73,24 @@ func New(serviceName string, config Config) (*Service, error) {
 	s := &Service{
 		Context: ctx,
 		Name:    serviceName,
-		Log:     logger.New(serviceName),
 		internal: &internal{
 			cancel: cancel,
 			config: &config,
 		},
 	}
 
-	// Load the credentials
+	// Configure the logger
 	var err error
+	s.Log, err = logger.NewGoogleCloudLogging(logger.Config{
+		GCPProjectID: config.GCPProjectID,
+		Production:   runningInProduction(),
+		LogName:      "service-log",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to configure logger: %w", err)
+	}
+
+	// Load the credentials
 	s.GoogleCredentials, err = gcpcredentials.NewCredentials(ctx, gcpcredentials.Config{
 		Scopes: []string{
 			"https://www.googleapis.com/auth/cloud-platform",
@@ -160,7 +170,7 @@ func (s *Service) Run(state State) {
 		return
 	case err := <-teardownComplete:
 		if err != nil {
-			s.Log.Errorf("teardown completed with an error: %w", err)
+			s.Log.Error("teardown completed with an error", slog.Any("error", err))
 		}
 	}
 }
@@ -199,7 +209,8 @@ func (s *Service) AddAuthenticatedEndpoint(method, relativePath string, handler 
 
 	// Confirm an AuthProvider exists
 	if s.internal.auth == nil {
-		s.Log.Fatal("AddAuthenticatedEndpoint requires the service to be initialized with an AuthProvider")
+		s.Log.Error("AddAuthenticatedEndpoint requires the service to be initialized with an AuthProvider")
+		os.Exit(1)
 	}
 
 	// Middleware to wrap the handler for request authentication. It authenticates the request,
@@ -208,7 +219,7 @@ func (s *Service) AddAuthenticatedEndpoint(method, relativePath string, handler 
 		// Authenticate the request
 		authenticated, reason, err := s.internal.auth.Authenticate(r)
 		if err != nil {
-			s.Log.Errorf("failed to authenticated request: %w", err)
+			s.Log.Error("failed to authenticated request", slog.Any("error", err))
 			sendResponse(w, 500, "internal server error")
 			return
 		}
@@ -229,7 +240,7 @@ func (s *Service) AddAuthenticatedEndpoint(method, relativePath string, handler 
 		}
 		authorized, err := s.internal.auth.Authorize(r, requirements)
 		if err != nil {
-			s.Log.Errorf("failed to authorize request: %w", err)
+			s.Log.Error("failed to authorize request", slog.Any("error", err))
 			sendResponse(w, 500, "internal server error")
 			return
 		}
@@ -245,14 +256,15 @@ func (s *Service) AddAuthenticatedEndpoint(method, relativePath string, handler 
 			return
 		}
 		if err := router.SendResponse(w, resp.StatusCode, resp.Headers, resp.Body); err != nil {
-			s.Log.Errorf("failed to send response: %w", err)
+			s.Log.Error("failed to send response", slog.Any("error", err))
 		}
 	}
 
 	// Register the wrapped handler to the router to handle requests on the given relativePath.
 	// Log a fatal error if the handler registration fails.
 	if err := s.internal.router.RegisterHandler(method, relativePath, wrappedHandler); err != nil {
-		s.Log.Fatalf("failed to add endpoint [%s %s]: %w", method, relativePath, err)
+		s.Log.Error("failed to register handler", slog.Any("error", err), slog.Any("method", method), slog.Any("relative_path", relativePath))
+		os.Exit(1)
 	}
 }
 
@@ -277,7 +289,7 @@ func (s *Service) AddCloudTask(relativePath string, handler func(*Service, *http
 		// Invoke the provided handler function with the request.
 		// If the handler returns an error, log it and respond with a 500 Internal Server Error status.
 		if err := handler(s, r); err != nil {
-			s.Log.Errorf("failed to handle request: %w", err)
+			s.Log.Error("failed to handle request", slog.Any("error", err))
 			sendResponse(w, http.StatusInternalServerError, "internal server error")
 			return
 		}
@@ -289,7 +301,7 @@ func (s *Service) AddCloudTask(relativePath string, handler func(*Service, *http
 	// Register the wrapped handler to the router to handle POST requests on the given relativePath.
 	// Log a fatal error if the handler registration fails.
 	if err := s.internal.router.RegisterHandler("POST", relativePath, wrappedHandler); err != nil {
-		s.Log.Fatalf("failed to add Cloud Task [POST %s]: %w", relativePath, err)
+		s.Log.Error("failed to add Cloud Task", slog.Any("error", err), slog.Any("relative_path", relativePath))
 	}
 }
 
@@ -314,7 +326,7 @@ func (s *Service) AddCronjob(relativePath string, handler func(*Service, *http.R
 		// Invoke the provided handler function with the request.
 		// If the handler returns an error, log it and respond with a 500 Internal Server Error status.
 		if err := handler(s, r); err != nil {
-			s.Log.Errorf("failed to handle request: %w", err)
+			s.Log.Error("failed to handle request", slog.Any("error", err))
 			sendResponse(w, http.StatusInternalServerError, "internal server error")
 			return
 		}
@@ -326,7 +338,9 @@ func (s *Service) AddCronjob(relativePath string, handler func(*Service, *http.R
 	// Register the wrapped handler to the router to handle POST requests on the given relativePath.
 	// Log a fatal error if the handler registration fails.
 	if err := s.internal.router.RegisterHandler("POST", relativePath, wrappedHandler); err != nil {
-		s.Log.Fatalf("failed to add Cloud Scheduler [POST %s]: %w", relativePath, err)
+		s.Log.Error("failed to add Cronjob", slog.Any("error", err), slog.Any("relative_path", relativePath))
+		os.Exit(1)
+
 	}
 }
 
@@ -345,14 +359,15 @@ func (s *Service) AddPublicEndpoint(method, relativePath string, handler func(*S
 			resp = Text(500, "internal server error")
 		}
 		if err := router.SendResponse(w, resp.StatusCode, resp.Headers, resp.Body); err != nil {
-			s.Log.Errorf("failed to send response: %w", err)
+			s.Log.Error("failed to send response", slog.Any("error", err))
 		}
 	}
 
 	// Register the wrapped handler to the router to handle requests on the given relativePath.
 	// Log a fatal error if the handler registration fails.
 	if err := s.internal.router.RegisterHandler(method, relativePath, wrappedHandler); err != nil {
-		s.Log.Fatalf("failed to add endpoint [%s %s]: %w", method, relativePath, err)
+		s.Log.Error("failed to register handler", slog.Any("error", err), slog.Any("method", method), slog.Any("relative_path", relativePath))
+		os.Exit(1)
 	}
 }
 
@@ -360,7 +375,8 @@ func (s *Service) AddServiceEndpoint(method, relativePath string, handler func(*
 
 	// Confirm an AuthProvider exists
 	if s.internal.auth == nil {
-		s.Log.Fatal("AddServiceEndpoint requires the service to be initialized with an AuthProvider")
+		s.Log.Error("AddServiceEndpoint requires the service to be initialized with an AuthProvider")
+		os.Exit(1)
 	}
 
 	// Middleware to wrap the handler for request authentication. It authenticates the request,
@@ -369,7 +385,7 @@ func (s *Service) AddServiceEndpoint(method, relativePath string, handler func(*
 		// Authenticate the request
 		authenticated, reason, err := s.internal.auth.Authenticate(r)
 		if err != nil {
-			s.Log.Errorf("failed to authenticated request: %w", err)
+			s.Log.Error("failed to authenticated request", slog.Any("error", err))
 			sendResponse(w, 500, "internal server error")
 			return
 		}
@@ -395,14 +411,15 @@ func (s *Service) AddServiceEndpoint(method, relativePath string, handler func(*
 			return
 		}
 		if err := router.SendResponse(w, resp.StatusCode, resp.Headers, resp.Body); err != nil {
-			s.Log.Errorf("failed to send response: %w", err)
+			s.Log.Error("failed to send response", slog.Any("error", err))
 		}
 	}
 
 	// Register the wrapped handler to the router to handle requests on the given relativePath.
 	// Log a fatal error if the handler registration fails.
 	if err := s.internal.router.RegisterHandler(method, relativePath, wrappedHandler); err != nil {
-		s.Log.Fatalf("failed to add endpoint [%s %s]: %w", method, relativePath, err)
+		s.Log.Error("failed to register handler", slog.Any("error", err), slog.Any("method", method), slog.Any("relative_path", relativePath))
+		os.Exit(1)
 	}
 }
 
@@ -437,7 +454,7 @@ func (s *Service) AddPubSubEndpoint(relativePath string, handler func(*Service, 
 
 		// If the JSON unmarshalling fails, log the error and respond with a 400 Bad Request status.
 		if err := UnmarshalJSONBody(r, &envelope); err != nil {
-			s.Log.Errorf("failed to decode message envelope: %w", err)
+			s.Log.Error("failed to decode message envelope", slog.Any("error", err))
 			sendResponse(w, http.StatusBadRequest, "bad request")
 			return
 		}
@@ -453,7 +470,7 @@ func (s *Service) AddPubSubEndpoint(relativePath string, handler func(*Service, 
 
 		// If data decoding fails, log the error and respond with a 400 Bad Request status.
 		if err != nil {
-			s.Log.Errorf("failed to decode message data: %w", err)
+			s.Log.Error("failed to decode message data", slog.Any("error", err))
 			sendResponse(w, http.StatusBadRequest, "bad request")
 			return
 		}
@@ -461,7 +478,7 @@ func (s *Service) AddPubSubEndpoint(relativePath string, handler func(*Service, 
 		// Invoke the provided handler function with the decoded Pub/Sub message.
 		// If the handler returns an error, log it and respond with a 500 Internal Server Error status.
 		if err := handler(s, message); err != nil {
-			s.Log.Errorf("failed to handle message: %w", err)
+			s.Log.Error("failed to handle message", slog.Any("error", err))
 			sendResponse(w, http.StatusInternalServerError, "internal server error")
 			return
 		}
@@ -473,7 +490,8 @@ func (s *Service) AddPubSubEndpoint(relativePath string, handler func(*Service, 
 	// Register the wrapped handler to the router to handle POST requests on the given relativePath.
 	// Log a fatal error if the handler registration fails.
 	if err := s.internal.router.RegisterHandler("POST", relativePath, wrappedHandler); err != nil {
-		s.Log.Fatalf("failed to add PubSub [POST %s]: %w", relativePath, err)
+		s.Log.Error("failed to register handler", slog.Any("error", err), slog.Any("relative_path", relativePath))
+		os.Exit(1)
 	}
 }
 

@@ -27,13 +27,13 @@ import (
 	"database/sql"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"time"
 
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	credentials "cloud.google.com/go/iam/credentials/apiv1"
 	"cloud.google.com/go/storage"
-	"github.com/albeebe/service/internal/logger"
 	"github.com/albeebe/service/pkg/auth"
 	"github.com/albeebe/service/pkg/pubsub"
 	"github.com/albeebe/service/pkg/router"
@@ -47,7 +47,7 @@ type Service struct {
 	GoogleCredentials  *google.Credentials
 	IAMClient          *credentials.IamCredentialsClient
 	DB                 *sql.DB
-	Log                *logger.Logger
+	Log                *slog.Logger
 	Name               string
 	internal           *internal
 }

@@ -26,6 +26,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"sync"
 	"time"
@@ -174,7 +175,7 @@ func (s *Service) startAuthService() {
 		select {
 		case err := <-s.internal.auth.Start():
 			if err != nil {
-				s.Log.Errorf("auth error: %w", err)
+				s.Log.Error("failed to start auth service", slog.Any("error", err))
 			}
 		case <-s.Context.Done():
 			return

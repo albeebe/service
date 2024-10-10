@@ -22,5 +22,37 @@
 
 package logger
 
-type Logger struct {
+import (
+	"context"
+	"log/slog"
+
+	"cloud.google.com/go/logging"
+)
+
+// Enabled checks if the log level is enabled for this handler.
+func (h *GoogleCloudLoggingHandler) Enabled(_ context.Context, level slog.Level) bool {
+	// Only log if the level is equal to or higher than the handler's log level
+	return true
+}
+
+// Implement the slog.Handler interface
+func (h *GoogleCloudLoggingHandler) Handle(ctx context.Context, r slog.Record) error {
+	// Convert slog.Record to a Google Cloud log entry
+	entry := logging.Entry{
+		Severity: logging.Info, // Map slog levels to Google Cloud severity levels
+		Payload:  r.Message,    // Use slog's message
+	}
+
+	h.logger.Log(entry) // Forward the log entry to Google Cloud Logging
+	return nil
+}
+
+func (h *GoogleCloudLoggingHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	// Customize as needed
+	return h
+}
+
+func (h *GoogleCloudLoggingHandler) WithGroup(name string) slog.Handler {
+	// Customize as needed
+	return h
 }
