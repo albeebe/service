@@ -1,4 +1,4 @@
-module github.com/albeebe/service/pkg/gcpcredentials
+module github.com/albeebe/service/pkg/credentials
 
 go 1.22.3
 

@@ -14,8 +14,8 @@ Simplifies managing environment variables. It prompts for missing variables in l
 
 <hr>
 
-### [gcpcredentials](gcpcredentials)
-Simplifies the process of obtaining and managing Google Cloud credentials. It provides utility functions to initialize credentials, extract email addresses associated with the credentials, and handle both local and production environments (running on Google Cloud).
+### [credentials](credentials)
+Simplifies initializing cloud credentials and extracting associated email addresses. **Currently supports Google Cloud Platform (GCP)**, but is designed with a path in mind to support other cloud providers in the future.
 
 <hr>
 

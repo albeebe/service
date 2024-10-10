@@ -20,7 +20,7 @@
 //
 // Created: September 30, 2024
 
-package gcpcredentials
+package credentials
 
 type Config struct {
 	Scopes []string

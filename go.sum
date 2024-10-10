@@ -32,6 +32,8 @@ github.com/albeebe/service/pkg/environment v0.0.0-20241009172118-934e0d4f6b20 h1
 github.com/albeebe/service/pkg/environment v0.0.0-20241009172118-934e0d4f6b20/go.mod h1:/Vgmzd5uFGsfPPaXGFN4JLafsFOcwSLr7/KfmsHFSRY=
 github.com/albeebe/service/pkg/gcpcredentials v0.0.0-20241009172118-934e0d4f6b20 h1:2AetYlRWgETIQ9tjRxK1WMzfC64Qb9JJ19kZJ15t6FU=
 github.com/albeebe/service/pkg/gcpcredentials v0.0.0-20241009172118-934e0d4f6b20/go.mod h1:tkT1pyFTX7pOFB1VT6KGvhOP3Uyq2Hsv2XWMU/6kAo8=
+github.com/albeebe/service/pkg/logger v0.0.0-20241010154610-4ca685ce7364 h1:WrC9onwIp6FHlmEhEjzauAFu055QXYf4rUMWKV7W2LM=
+github.com/albeebe/service/pkg/logger v0.0.0-20241010154610-4ca685ce7364/go.mod h1:g5vMBtH3JYD0gkCSXK7+YVepyd5wOJI/qg7dfJx6WlE=
 github.com/albeebe/service/pkg/pubsub v0.0.0-20241009172118-934e0d4f6b20 h1:CdoVOkHg6FBR6l0lncxtRbcCrEIMvlDC0FNtOxO+d7Q=
 github.com/albeebe/service/pkg/pubsub v0.0.0-20241009172118-934e0d4f6b20/go.mod h1:6uSg+yLWs+QsJg+KHnWbakMiMSL2oSzkSauoizlAfF0=
 github.com/bytedance/sonic v1.11.6 h1:oUp34TzMlL+OY1OUWxHqsdkgC/Zfc85zGqw9siXjrc0=

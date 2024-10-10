@@ -20,7 +20,7 @@
 //
 // Created: September 30, 2024
 
-package gcpcredentials
+package credentials
 
 import (
 	"context"
@@ -33,10 +33,10 @@ import (
 	"golang.org/x/oauth2/google"
 )
 
-// NewCredentials initializes Google Cloud credentials based on the provided configuration.
+// NewGoogleCredentials initializes Google Cloud credentials based on the provided configuration.
 // It validates the configuration, retrieves the default credentials for the given scopes,
 // and returns them. If any step fails, it returns an error.
-func NewCredentials(ctx context.Context, config Config) (*google.Credentials, error) {
+func NewGoogleCredentials(ctx context.Context, config Config) (*google.Credentials, error) {
 	// Validate the provided configuration.
 	if err := config.Validate(); err != nil {
 		return nil, fmt.Errorf("configuration validation failed: %w", err)
@@ -51,9 +51,9 @@ func NewCredentials(ctx context.Context, config Config) (*google.Credentials, er
 	return creds, nil
 }
 
-// ExtractEmail returns the email address associated with the given Google credentials.
+// EmailFromGoogleCredentials returns the email address associated with the given Google credentials.
 // It handles both production environments (running on Google Cloud) and local development environments.
-func ExtractEmail(creds *google.Credentials) (string, error) {
+func EmailFromGoogleCredentials(creds *google.Credentials) (string, error) {
 	const metadataURL = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=https://www.google.com"
 	var identityToken string
 
