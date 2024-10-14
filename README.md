@@ -1,10 +1,6 @@
 # Service Library for Go
 
-`service` is a Go library designed to simplify building services on Google Cloud Platform (GCP), minimizing boilerplate code, and making your `main.go` as clean and self-documenting as the index of a book.
-
-## Overview
-
-Building services on GCP often involves repetitive setup and configuration, leading to cluttered `main.go` files and scattered initialization code. This library streamlines that process by providing a structured and simplified approach to service creation, allowing you to focus on your business logic.
+`service` is a Go library built to streamline the development of services on Google Cloud Platform. By minimizing boilerplate code and automating much of the setup, it allows you to focus on your business logic without getting bogged down in infrastructure details. The result? A clean, readable main.go file that acts like an index, offering a clear and concise overview of your service — self-documenting and easy to maintain. Whether you're setting up authentication, Pub/Sub, or handling Cloud Tasks, this library is designed to make your services simple, scalable, and production-ready from the start.
 
 ## Features
 
