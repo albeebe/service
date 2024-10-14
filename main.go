@@ -83,7 +83,6 @@ func New(serviceName string, config Config) (*Service, error) {
 		return nil, fmt.Errorf("failed to initialize logger: %w", err)
 	}
 
-	s.Log.Error("Just testing an error", slog.Any("error", errors.New("My Error")))
 	// Load the credentials
 	var err error
 	s.GoogleCredentials, err = gcpcredentials.NewCredentials(ctx, gcpcredentials.Config{
