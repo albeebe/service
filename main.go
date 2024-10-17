@@ -199,7 +199,7 @@ func (s *Service) AddAuthProvider(authProvider auth.AuthProvider) error {
 // If authentication fails, a 401 Unauthorized response is returned. If authorization
 // requirements are provided and the request fails authorization, a 403 Forbidden response is returned.
 // In case of an internal error during processing, a 500 Internal Server Error is returned.
-func (s *Service) AddAuthenticatedEndpoint(method, relativePath string, handler func(*Service, *http.Request) *HTTPResponse, authRequirements ...auth.AuthRequirements) {
+func (s *Service) AddAuthenticatedEndpoint(method, relativePath string, handler EndpointHandler, authRequirements ...auth.AuthRequirements) {
 
 	// Confirm an AuthProvider exists
 	if s.internal.auth == nil {
@@ -265,7 +265,7 @@ func (s *Service) AddAuthenticatedEndpoint(method, relativePath string, handler 
 // AddCloudTaskEndpoint registers a new POST endpoint at the specified relativePath to handle
 // incoming Google Cloud Tasks. In production, it verifies the authenticity of the request,
 // while in local or non-production environments, request verification is skipped.
-func (s *Service) AddCloudTaskEndpoint(relativePath string, handler func(*Service, *http.Request) error) {
+func (s *Service) AddCloudTaskEndpoint(relativePath string, handler EndpointHandler) {
 
 	// wrappedHandler is the middleware that processes the incoming request.
 	wrappedHandler := func(w http.ResponseWriter, r *http.Request) {
@@ -302,7 +302,7 @@ func (s *Service) AddCloudTaskEndpoint(relativePath string, handler func(*Servic
 // AddCloudSchedulerEndpoint registers a new POST endpoint at the specified relativePath to handle
 // incoming Google Cloud Scheduler requests. In production, it verifies the authenticity of the
 // request, while in local or non-production environments, request verification is skipped.
-func (s *Service) AddCloudSchedulerEndpoint(relativePath string, handler func(*Service, *http.Request) error) {
+func (s *Service) AddCloudSchedulerEndpoint(relativePath string, handler EndpointHandler) {
 
 	// wrappedHandler is the middleware that processes the incoming request.
 	wrappedHandler := func(w http.ResponseWriter, r *http.Request) {
@@ -344,7 +344,7 @@ func (s *Service) AddCloudSchedulerEndpoint(relativePath string, handler func(*S
 // This endpoint does not require authentication.
 // If an error occurs while registering the endpoint, the function will log the error
 // and terminate the program.
-func (s *Service) AddPublicEndpoint(method, relativePath string, handler func(*Service, *http.Request) *HTTPResponse) {
+func (s *Service) AddPublicEndpoint(method, relativePath string, handler EndpointHandler) {
 
 	// Wrap the handler, so we can pass the service to it and handle sending the response
 	wrappedHandler := func(w http.ResponseWriter, r *http.Request) {
@@ -380,7 +380,7 @@ func (s *Service) AddPublicEndpoint(method, relativePath string, handler func(*S
 // In case of an internal error during processing, a 500 Internal Server Error is returned.
 // This endpoint is intended for use by other services and ensures only authenticated and verified service requests
 // are permitted.
-func (s *Service) AddServiceEndpoint(method, relativePath string, handler func(*Service, *http.Request) *HTTPResponse, authRequirements ...auth.AuthRequirements) {
+func (s *Service) AddServiceEndpoint(method, relativePath string, handler EndpointHandler, authRequirements ...auth.AuthRequirements) {
 
 	// Confirm an AuthProvider exists
 	if s.internal.auth == nil {
@@ -453,7 +453,7 @@ func (s *Service) AddServiceEndpoint(method, relativePath string, handler func(*
 // Pub/Sub messages. In production, it verifies the authenticity of the request, while in
 // local or non-production environments, request verification is skipped. The function
 // decodes the Pub/Sub message and invokes the provided handler function with the decoded message.
-func (s *Service) AddPubSubEndpoint(relativePath string, handler func(*Service, PubSubMessage) error) {
+func (s *Service) AddPubSubEndpoint(relativePath string, handler PubSubHandler) {
 
 	// wrappedHandler is the middleware that processes the incoming request.
 	wrappedHandler := func(w http.ResponseWriter, r *http.Request) {

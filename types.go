@@ -40,6 +40,10 @@ import (
 	"golang.org/x/oauth2/google"
 )
 
+type EndpointHandler func(*Service, *http.Request) *HTTPResponse
+
+type PubSubHandler func(*Service, PubSubMessage) error
+
 type Service struct {
 	Context            context.Context
 	CloudStorageClient *storage.Client
