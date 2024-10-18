@@ -219,8 +219,6 @@ func (s *Service) teardown(timeout time.Duration) error {
 		Function func() error
 	}
 	components := []Component{
-		{"Cloud SQL", s.teardownCloudSQL},
-		{"Logger", s.teardownLogger},
 		{"Router", s.teardownRouter},
 	}
 
@@ -269,6 +267,19 @@ func (s *Service) teardown(timeout time.Duration) error {
 		}
 	}
 
+	// Teardown CloudSQL followed by flushing the logger.
+	// We delay tearing down the CloudSQL (database) and flushing the logger until last
+	// because other components may still require access to the database or logging
+	// capabilities during their own teardown processes. By shutting down the database
+	// and flushing logs last, we ensure that any necessary resources remain available
+	// and that all logged messages are written out before completing the overall shutdown.
+	if err := s.teardownCloudSQL(); err != nil {
+		s.Log.Error("failed to tear down CloudSQL", slog.Any("error", err))
+	}
+	if err := s.flushLogger(); err != nil {
+		s.Log.Error("failed to flush the logger", slog.Any("error", err))
+	}
+
 	return finalErr
 }
 
@@ -283,16 +294,13 @@ func (s *Service) teardownCloudSQL() (err error) {
 	return nil
 }
 
-// teardownLogger ensures that all pending log entries are flushed to their destination
-// (such as Google Cloud Logging) before shutting down the logger.
-func (s *Service) teardownLogger() (err error) {
+// flushLogger ensures that all pending log entries are flushed to their destination
+// (such as Google Cloud Logging)
+func (s *Service) flushLogger() (err error) {
 	if s.Log != nil {
-		if err := logger.FlushLogger(s.Log); err != nil {
-			return err
-		}
-		s.Log = nil
+		err = logger.FlushLogger(s.Log)
 	}
-	return nil
+	return
 }
 
 // teardownRouter gracefully shuts down the router, immediately stopping it from accepting
