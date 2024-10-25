@@ -37,12 +37,15 @@ import (
 	"github.com/albeebe/service/pkg/auth"
 	"github.com/albeebe/service/pkg/pubsub"
 	"github.com/albeebe/service/pkg/router"
+	"github.com/gorilla/websocket"
 	"golang.org/x/oauth2/google"
 )
 
 type EndpointHandler func(*Service, *http.Request) *HTTPResponse
 
 type PubSubHandler func(*Service, PubSubMessage) error
+
+type WebsocketHandler func(*Service, *websocket.Conn)
 
 type Service struct {
 	Context            context.Context

@@ -74,6 +74,9 @@ func main() {
   s.AddAuthenticatedEndpoint("GET", "/role", endpoints.GetRole, auth.AnyRole("viewer", "editor"))
   s.AddAuthenticatedEndpoint("GET", "/permissions", endpoints.GetPermissions, auth.AllPermissions("project.create"))
 
+  // Add websocket endpoints
+  s.AddWebsocket("/websocket", endpoints.Websocket)
+  
   // Add endpoints that only services can access
   s.AddServiceEndpoint("GET", "/service", endpoints.GetService)
 
@@ -160,6 +163,12 @@ By abstracting away the boilerplate, your `main.go` remains clean and self-docum
   func (s *Service) AddAuthenticatedEndpoint(method, path string, handler func(*Service, *http.Request) *HTTPResponse, authRequirements ...auth.AuthRequirements)
   ```
 
+- **Websocket Endpoints**: For handlers that want to automatically upgrade HTTP requests to WebSocket connections.
+
+  ```go
+  func (s *Service) AddWebsocketEndpoint(relativePath string, handler func(*Service, *websocket.Conn))
+  ```
+  
 - **Service Endpoints**: For internal service-to-service communication with strict authentication.
 
   ```go

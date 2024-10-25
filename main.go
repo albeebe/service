@@ -45,6 +45,7 @@ import (
 	"github.com/albeebe/service/pkg/pubsub"
 	"github.com/albeebe/service/pkg/router"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/gorilla/websocket"
 )
 
 // Initialize loads the environment variables specified in the provided spec struct.
@@ -517,6 +518,39 @@ func (s *Service) AddPubSubEndpoint(relativePath string, handler PubSubHandler) 
 	// Log a fatal error if the handler registration fails.
 	if err := s.internal.router.RegisterHandler("POST", relativePath, wrappedHandler); err != nil {
 		s.Log.Error("failed to register handler", slog.Any("error", err), slog.Any("relative_path", relativePath))
+		os.Exit(1)
+	}
+}
+
+// AddWebsocketEndpoint registers a WebSocket handler at the specified relative path, handling the WebSocket
+// upgrade process and connection lifecycle. It wraps the provided WebsocketHandler function with
+// middleware to upgrade HTTP requests to WebSocket connections, and automatically closes the connection
+// when the handler completes.
+func (s *Service) AddWebsocketEndpoint(relativePath string, handler WebsocketHandler) {
+
+	var upgrader = websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+		CheckOrigin: func(r *http.Request) bool {
+			return true
+		},
+	}
+
+	// wrappedHandler is the middleware that processes the incoming request.
+	wrappedHandler := func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			s.Log.Error("failed to upgrade request to a websocket", slog.Any("error", err), slog.Any("relative_path", relativePath))
+			return
+		}
+		defer conn.Close()
+		handler(s, conn)
+	}
+
+	// Register the wrapped handler to the router to handle GET requests on the given relativePath.
+	// Log a fatal error if the handler registration fails.
+	if err := s.internal.router.RegisterHandler("GET", relativePath, wrappedHandler); err != nil {
+		s.Log.Error("failed to register websocket handler", slog.Any("error", err), slog.Any("relative_path", relativePath))
 		os.Exit(1)
 	}
 }
