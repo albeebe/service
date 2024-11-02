@@ -282,11 +282,12 @@ func (s *Service) AddCloudTaskEndpoint(relativePath string, handler EndpointHand
 		}
 
 		// Invoke the provided handler function with the request.
-		// If the handler returns an error, log it and respond with a 500 Internal Server Error status.
-		if err := handler(s, r); err != nil {
-			s.Log.Error("failed to handle request", slog.Any("error", err))
-			sendResponse(w, http.StatusInternalServerError, "internal server error")
-			return
+		resp := handler(s, r)
+		if resp == nil {
+			resp = Text(500, "internal server error")
+		}
+		if err := router.SendResponse(w, resp.StatusCode, resp.Headers, resp.Body); err != nil {
+			s.Log.Error("failed to send response", slog.Any("error", err))
 		}
 
 		// If the handler succeeds, respond with a 200 OK status.
@@ -319,11 +320,12 @@ func (s *Service) AddCloudSchedulerEndpoint(relativePath string, handler Endpoin
 		}
 
 		// Invoke the provided handler function with the request.
-		// If the handler returns an error, log it and respond with a 500 Internal Server Error status.
-		if err := handler(s, r); err != nil {
-			s.Log.Error("failed to handle request", slog.Any("error", err))
-			sendResponse(w, http.StatusInternalServerError, "internal server error")
-			return
+		resp := handler(s, r)
+		if resp == nil {
+			resp = Text(500, "internal server error")
+		}
+		if err := router.SendResponse(w, resp.StatusCode, resp.Headers, resp.Body); err != nil {
+			s.Log.Error("failed to send response", slog.Any("error", err))
 		}
 
 		// If the handler succeeds, respond with a 200 OK status.
