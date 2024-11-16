@@ -183,13 +183,52 @@ func (s *Service) Config() *Config {
 	return s.internal.config
 }
 
-// AddAuthProvider initializes the authentication provider for the service.
-func (s *Service) AddAuthProvider(authProvider auth.AuthProvider) error {
+// SetAuthProvider initializes the authentication provider for the service.
+func (s *Service) SetAuthProvider(authProvider auth.AuthProvider) error {
 	var err error
 	s.internal.auth, err = auth.New(s.Context, auth.Config{
 		AuthProvider: authProvider,
 	})
 	return err
+}
+
+// AuthenticateRequest validates an HTTP request by performing both
+// authentication and authorization checks using the AuthProvider configured for the service.
+// It ensures the request is authenticated and then verifies that it meets the specified
+// authorization requirements (roles and permissions).
+//
+// Parameters:
+// - r: The HTTP request to be authenticated and authorized.
+// - authRequirements: A variadic list of authorization requirements.
+//
+// Returns:
+// - A boolean indicating whether the request is successfully authenticated and authorized.
+// - An error if something goes wrong.
+//
+// Notes:
+// - Uses the service's configured AuthProvider to perform all checks.
+func (s *Service) AuthenticateRequest(r *http.Request, authRequirements ...auth.AuthRequirements) (bool, error) {
+
+	// Authenticate the request
+	authenticated, _, err := s.internal.auth.Authenticate(r)
+	if err != nil {
+		return false, fmt.Errorf("failed to authenticate request: %w", err)
+	}
+	if !authenticated {
+		return false, nil
+	}
+
+	// Authorize the request
+	requirements := auth.AuthRequirements{}
+	for _, r := range authRequirements {
+		requirements.AnyRole = append(requirements.AnyRole, r.AnyRole...)
+		requirements.AllPermissions = append(requirements.AllPermissions, r.AllPermissions...)
+	}
+	authorized, err := s.internal.auth.Authorize(r, requirements)
+	if err != nil {
+		return false, fmt.Errorf("failed to authorize request: %w", err)
+	}
+	return authorized, nil
 }
 
 // AddAuthenticatedEndpoint registers an HTTP endpoint that requires authentication
