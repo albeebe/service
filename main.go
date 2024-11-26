@@ -231,6 +231,12 @@ func (s *Service) AuthenticateRequest(r *http.Request, authRequirements ...auth.
 	return authorized, nil
 }
 
+// IsRequestFromService checks whether the given HTTP request originates from a service.
+// It delegates the request to the underlying AuthProvider to perform the service request check.
+func (s *Service) IsRequestFromService(r *http.Request) bool {
+	return s.internal.auth.IsServiceRequest(r)
+}
+
 // AddAuthenticatedEndpoint registers an HTTP endpoint that requires authentication
 // and optionally authorization. It first authenticates the request, and if authorization
 // requirements (roles or permissions) are provided, it checks them before passing
