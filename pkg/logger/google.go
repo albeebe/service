@@ -25,6 +25,7 @@ package logger
 import (
 	"context"
 	"log/slog"
+	"runtime/debug"
 
 	"cloud.google.com/go/logging"
 )
@@ -45,9 +46,14 @@ func (h *GoogleCloudLoggingHandler) Handle(ctx context.Context, r slog.Record) e
 
 	// Collect attributes from slog.Record
 	r.Attrs(func(a slog.Attr) bool {
-		attributes[a.Key] = a.Value
+		attributes[a.Key] = a.Value.Any()
 		return true // Continue iterating over all attributes
 	})
+
+	// Add stack trace to attributes for errors
+	if r.Level == slog.LevelError {
+		attributes["stack_trace"] = string(debug.Stack())
+	}
 
 	// Create a Google Cloud Logging entry with the log message and structured data
 	entry := logging.Entry{
