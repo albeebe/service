@@ -33,7 +33,7 @@ import (
 	"strings"
 
 	"cloud.google.com/go/compute/metadata"
-	"github.com/albeebe/service/pkg/router"
+	"github.com/albeebe/service/internal/router"
 	"google.golang.org/api/idtoken"
 )
 

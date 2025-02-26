@@ -39,11 +39,11 @@ import (
 	"time"
 
 	"cloud.google.com/go/iam/credentials/apiv1/credentialspb"
-	"github.com/albeebe/service/pkg/auth"
-	"github.com/albeebe/service/pkg/credentials"
-	"github.com/albeebe/service/pkg/environment"
-	"github.com/albeebe/service/pkg/pubsub"
-	"github.com/albeebe/service/pkg/router"
+	"github.com/albeebe/service/internal/auth"
+	"github.com/albeebe/service/internal/credentials"
+	"github.com/albeebe/service/internal/environment"
+	"github.com/albeebe/service/internal/pubsub"
+	"github.com/albeebe/service/internal/router"
 	"github.com/golang-jwt/jwt"
 	"github.com/gorilla/websocket"
 )
