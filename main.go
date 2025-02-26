@@ -40,11 +40,11 @@ import (
 
 	"cloud.google.com/go/iam/credentials/apiv1/credentialspb"
 	"github.com/albeebe/service/pkg/auth"
+	"github.com/albeebe/service/pkg/credentials"
 	"github.com/albeebe/service/pkg/environment"
-	"github.com/albeebe/service/pkg/gcpcredentials"
 	"github.com/albeebe/service/pkg/pubsub"
 	"github.com/albeebe/service/pkg/router"
-	"github.com/golang-jwt/jwt/v5"
+	"github.com/golang-jwt/jwt"
 	"github.com/gorilla/websocket"
 )
 
@@ -86,7 +86,7 @@ func New(serviceName string, config Config) (*Service, error) {
 
 	// Load the credentials
 	var err error
-	s.GoogleCredentials, err = gcpcredentials.NewCredentials(ctx, gcpcredentials.Config{
+	s.GoogleCredentials, err = credentials.NewGoogleCredentials(ctx, credentials.Config{
 		Scopes: []string{
 			"https://www.googleapis.com/auth/cloud-platform",
 			"https://www.googleapis.com/auth/sqlservice.admin",
