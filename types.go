@@ -34,9 +34,9 @@ import (
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	credentials "cloud.google.com/go/iam/credentials/apiv1"
 	"cloud.google.com/go/storage"
-	"github.com/albeebe/service/internal/auth"
-	"github.com/albeebe/service/internal/pubsub"
-	"github.com/albeebe/service/internal/router"
+	"github.com/albeebe/service/pkg/auth"
+	"github.com/albeebe/service/pkg/pubsub"
+	"github.com/albeebe/service/pkg/router"
 	"github.com/gorilla/websocket"
 	"golang.org/x/oauth2/google"
 )
