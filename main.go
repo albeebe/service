@@ -38,6 +38,7 @@ import (
 	"syscall"
 	"time"
 
+	taskspb "cloud.google.com/go/cloudtasks/apiv2/cloudtaskspb"
 	"cloud.google.com/go/iam/credentials/apiv1/credentialspb"
 	"github.com/albeebe/service/pkg/auth"
 	"github.com/albeebe/service/pkg/credentials"
@@ -46,6 +47,8 @@ import (
 	"github.com/albeebe/service/pkg/router"
 	"github.com/golang-jwt/jwt"
 	"github.com/gorilla/websocket"
+	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // Initialize loads the environment variables specified in the provided spec struct.
@@ -618,6 +621,51 @@ func (s *Service) AuthClient() (*http.Client, error) {
 	}
 
 	return client, nil
+}
+
+// CreateCloudTask creates and schedules a new task in the specified Cloud Tasks queue.
+//
+// The task is configured as an HTTP request with a POST method, sending the provided
+// request body to the given callback URL. It also includes an OIDC token for authentication.
+//
+// Parameters:
+//   - queue: The fully qualified name of the Cloud Tasks queue where the task will be created.
+//   - callbackURL: The URL that will receive the HTTP request when the task is executed.
+//   - body: The request payload to be sent in the task's HTTP request body.
+//   - delay: The duration to wait before the task is executed (schedules the task in the future).
+//   - timeout: The maximum duration allowed for the task to execute before it times out.
+//
+// Returns:
+//   - error: An error if the task creation fails, otherwise nil.
+//
+// The function uses the CloudTasksClient to create a new task with the specified parameters.
+// The task is authenticated using an OIDC token associated with the configured service account.
+func (s *Service) CreateCloudTask(queue, callbackURL string, body []byte, delay, timeout time.Duration) error {
+	// Configure the task
+	task := taskspb.Task{
+		MessageType: &taskspb.Task_HttpRequest{
+			HttpRequest: &taskspb.HttpRequest{
+				Url:        callbackURL,
+				Body:       body,
+				HttpMethod: taskspb.HttpMethod_POST,
+				AuthorizationHeader: &taskspb.HttpRequest_OidcToken{
+					OidcToken: &taskspb.OidcToken{
+						ServiceAccountEmail: s.internal.config.ServiceAccount,
+						Audience:            callbackURL,
+					},
+				},
+			},
+		},
+		ScheduleTime:     timestamppb.New(time.Now().Add(delay)),
+		DispatchDeadline: durationpb.New(timeout),
+	}
+
+	// Create the task
+	_, err := s.CloudTasksClient.CreateTask(s.Context, &taskspb.CreateTaskRequest{
+		Parent: queue,
+		Task:   &task,
+	})
+	return err
 }
 
 // GenerateGoogleIDToken generates a Google ID token for a given audience.
