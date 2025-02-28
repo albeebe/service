@@ -324,7 +324,7 @@ func (s *Service) AddCloudTaskEndpoint(relativePath string, handler EndpointHand
 		if runningInProduction() {
 			if err := verifyGoogleRequest(s.Context, r); err != nil {
 				// Respond with a 403 Forbidden status if verification fails.
-				sendResponse(w, http.StatusForbidden, "forbidden")
+				sendResponse(w, http.StatusForbidden, "forbidden: failed to validate Google ID token")
 				return
 			}
 		}
@@ -337,9 +337,6 @@ func (s *Service) AddCloudTaskEndpoint(relativePath string, handler EndpointHand
 		if err := router.SendResponse(w, resp.StatusCode, resp.Headers, resp.Body); err != nil {
 			s.Log.Error("failed to send response", slog.Any("error", err))
 		}
-
-		// If the handler succeeds, respond with a 200 OK status.
-		sendResponse(w, http.StatusOK, "OK")
 	}
 
 	// Register the wrapped handler to the router to handle POST requests on the given relativePath.
@@ -362,7 +359,7 @@ func (s *Service) AddCloudSchedulerEndpoint(relativePath string, handler Endpoin
 		if runningInProduction() {
 			if err := verifyGoogleRequest(s.Context, r); err != nil {
 				// Respond with a 403 Forbidden status if verification fails.
-				sendResponse(w, http.StatusForbidden, "forbidden")
+				sendResponse(w, http.StatusForbidden, "forbidden: failed to validate Google ID token")
 				return
 			}
 		}
@@ -375,9 +372,6 @@ func (s *Service) AddCloudSchedulerEndpoint(relativePath string, handler Endpoin
 		if err := router.SendResponse(w, resp.StatusCode, resp.Headers, resp.Body); err != nil {
 			s.Log.Error("failed to send response", slog.Any("error", err))
 		}
-
-		// If the handler succeeds, respond with a 200 OK status.
-		sendResponse(w, http.StatusOK, "OK")
 	}
 
 	// Register the wrapped handler to the router to handle POST requests on the given relativePath.
@@ -502,9 +496,8 @@ func (s *Service) AddServiceEndpoint(method, relativePath string, handler Endpoi
 
 // AddPubSubEndpoint registers a new POST endpoint at the specified relativePath to handle incoming
 // Pub/Sub messages. In production, it verifies the authenticity of the request, while in
-// local or non-production environments, request verification is skipped. The function
-// decodes the Pub/Sub message and invokes the provided handler function with the decoded message.
-func (s *Service) AddPubSubEndpoint(relativePath string, handler PubSubHandler) {
+// local or non-production environments, request verification is skipped.
+func (s *Service) AddPubSubEndpoint(relativePath string, handler EndpointHandler) {
 
 	// wrappedHandler is the middleware that processes the incoming request.
 	wrappedHandler := func(w http.ResponseWriter, r *http.Request) {
@@ -514,54 +507,20 @@ func (s *Service) AddPubSubEndpoint(relativePath string, handler PubSubHandler) 
 		if runningInProduction() {
 			if err := pubsub.ValidateGooglePubSubRequest(s.Context, r, ""); err != nil {
 				// Respond with a 403 Forbidden status if verification fails.
-				sendResponse(w, http.StatusForbidden, "forbidden")
+				sendResponse(w, http.StatusForbidden, "forbidden: failed to validate Google ID token")
 				return
 			}
 		}
 
-		// Decode the incoming JSON payload, which contains the Pub/Sub message envelope.
-		type Envelope struct {
-			Message struct {
-				Data        string    `json:"data"`
-				MessageID   string    `json:"messageId"`
-				PublishTime time.Time `json:"publishTime"`
-			} `json:"message"`
-		}
-		var envelope Envelope
-
-		// If the JSON unmarshalling fails, log the error and respond with a 400 Bad Request status.
-		if err := UnmarshalJSONBody(r, &envelope); err != nil {
-			s.Log.Error("failed to decode message envelope", slog.Any("error", err))
-			sendResponse(w, http.StatusBadRequest, "bad request")
+		// Send the request to the handler and handle the response
+		resp := handler(s, r)
+		if resp == nil {
+			sendResponse(w, 500, "internal server error")
 			return
 		}
-
-		// Decode the base64-encoded data from the Pub/Sub message.
-		message := PubSubMessage{
-			ID:        envelope.Message.MessageID,
-			Published: envelope.Message.PublishTime,
-			Data:      nil,
+		if err := router.SendResponse(w, resp.StatusCode, resp.Headers, resp.Body); err != nil {
+			s.Log.Error("failed to send response", slog.Any("error", err))
 		}
-		var err error
-		message.Data, err = base64.StdEncoding.DecodeString(envelope.Message.Data)
-
-		// If data decoding fails, log the error and respond with a 400 Bad Request status.
-		if err != nil {
-			s.Log.Error("failed to decode message data", slog.Any("error", err))
-			sendResponse(w, http.StatusBadRequest, "bad request")
-			return
-		}
-
-		// Invoke the provided handler function with the decoded Pub/Sub message.
-		// If the handler returns an error, log it and respond with a 500 Internal Server Error status.
-		if err := handler(s, message); err != nil {
-			s.Log.Error("failed to handle message", slog.Any("error", err))
-			sendResponse(w, http.StatusInternalServerError, "internal server error")
-			return
-		}
-
-		// If the handler succeeds, respond with a 200 OK status.
-		sendResponse(w, http.StatusOK, "OK")
 	}
 
 	// Register the wrapped handler to the router to handle POST requests on the given relativePath.
@@ -772,6 +731,44 @@ func ParseClaimsFromRequest(r *http.Request, claims interface{}) error {
 	}
 
 	return nil
+}
+
+// ParsePubSubEnvelope extracts and decodes the Pub/Sub message from an incoming HTTP request.
+//
+// This function expects a JSON payload containing a Pub/Sub message envelope. It performs the following steps:
+// 1. Decodes the JSON request body into a structured envelope.
+// 2. Extracts the base64-encoded message data, message ID, and publish timestamp.
+// 3. Returns the decoded data, message ID, and publish timestamp. If an error occurs at any step, it is returned.
+//
+// Parameters:
+//   - r *http.Request: The incoming HTTP request containing the Pub/Sub message.
+//
+// Returns:
+//   - []byte: The decoded message data.
+//   - string: The unique Pub/Sub message ID.
+//   - time.Time: The timestamp when the message was published.
+//   - error: An error if JSON decoding or base64 decoding fails, otherwise nil.
+func ParsePubSubEnvelope(r *http.Request) ([]byte, string, time.Time, error) {
+	// Unmarshal the JSON request body into the envelope structure.
+	type Envelope struct {
+		Message struct {
+			Data        string    `json:"data"`
+			MessageID   string    `json:"messageId"`
+			PublishTime time.Time `json:"publishTime"`
+		} `json:"message"`
+	}
+	var envelope Envelope
+	if err := UnmarshalJSONBody(r, &envelope); err != nil {
+		return nil, "", time.Time{}, fmt.Errorf("failed to unmarshal Pub/Sub message: %w", err)
+	}
+
+	// Decode the base64-encoded message data.
+	data, err := base64.StdEncoding.DecodeString(envelope.Message.Data)
+	if err != nil {
+		return nil, "", time.Time{}, fmt.Errorf("failed to decode base64 message data: %w", err)
+	}
+
+	return data, envelope.Message.MessageID, envelope.Message.PublishTime, nil
 }
 
 // PublishToPubSub sends a message to the specified Pub/Sub topic.
