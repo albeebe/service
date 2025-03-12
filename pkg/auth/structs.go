@@ -69,11 +69,6 @@ type Key struct {
 	Pem string `json:"pem"` // Key contains the RSA public key in PEM format.
 }
 
-type AuthRequirements struct {
-	AnyRole        []string // At least one of these roles must be present
-	AllPermissions []string // All of these permissions must be granted
-}
-
 // validate checks the Config struct for required fields and
 // returns an error if any required fields are missing
 func (c *Config) Validate() error {

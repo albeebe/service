@@ -198,11 +198,11 @@ func (s *Service) SetAuthProvider(authProvider auth.AuthProvider) error {
 // AuthenticateRequest validates an HTTP request by performing both
 // authentication and authorization checks using the AuthProvider configured for the service.
 // It ensures the request is authenticated and then verifies that it meets the specified
-// authorization requirements (roles and permissions).
+// authorization requirement.
 //
 // Parameters:
 // - r: The HTTP request to be authenticated and authorized.
-// - authRequirements: A variadic list of authorization requirements.
+// - permission: Name of a permission the client is required to have.
 //
 // Returns:
 // - A boolean indicating whether the request is successfully authenticated and authorized.
@@ -210,7 +210,7 @@ func (s *Service) SetAuthProvider(authProvider auth.AuthProvider) error {
 //
 // Notes:
 // - Uses the service's configured AuthProvider to perform all checks.
-func (s *Service) AuthenticateRequest(r *http.Request, authRequirements ...auth.AuthRequirements) (bool, error) {
+func (s *Service) AuthenticateRequest(r *http.Request, permission string) (bool, error) {
 
 	// Authenticate the request
 	authenticated, _, err := s.internal.auth.Authenticate(r)
@@ -222,12 +222,7 @@ func (s *Service) AuthenticateRequest(r *http.Request, authRequirements ...auth.
 	}
 
 	// Authorize the request
-	requirements := auth.AuthRequirements{}
-	for _, r := range authRequirements {
-		requirements.AnyRole = append(requirements.AnyRole, r.AnyRole...)
-		requirements.AllPermissions = append(requirements.AllPermissions, r.AllPermissions...)
-	}
-	authorized, err := s.internal.auth.Authorize(r, requirements)
+	authorized, err := s.internal.auth.Authorize(r, permission)
 	if err != nil {
 		return false, fmt.Errorf("failed to authorize request: %w", err)
 	}
@@ -240,15 +235,16 @@ func (s *Service) IsRequestFromService(r *http.Request) bool {
 	return s.internal.auth.IsServiceRequest(r)
 }
 
-// AddAuthenticatedEndpoint registers an HTTP endpoint that requires authentication
-// and optionally authorization. It first authenticates the request, and if authorization
-// requirements (roles or permissions) are provided, it checks them before passing
-// the request to the handler.
+// AddAuthenticatedEndpoint registers an HTTP endpoint that requires authentication.
+//
+// Optionally, a permission can be specified and is checked after authentication. If the permission requirements
+// is not met, a 403 Forbidden response is returned.
+//
 // If the service was initialized without an AuthProvider, it logs a fatal error and exits.
 // If authentication fails, a 401 Unauthorized response is returned. If authorization
 // requirements are provided and the request fails authorization, a 403 Forbidden response is returned.
 // In case of an internal error during processing, a 500 Internal Server Error is returned.
-func (s *Service) AddAuthenticatedEndpoint(method, relativePath string, handler EndpointHandler, authRequirements ...auth.AuthRequirements) {
+func (s *Service) AddAuthenticatedEndpoint(method, relativePath string, handler EndpointHandler, permission string) {
 
 	// Confirm an AuthProvider exists
 	if s.internal.auth == nil {
@@ -276,19 +272,14 @@ func (s *Service) AddAuthenticatedEndpoint(method, relativePath string, handler 
 		}
 
 		// Authorize the request
-		requirements := auth.AuthRequirements{}
-		for _, r := range authRequirements {
-			requirements.AnyRole = append(requirements.AnyRole, r.AnyRole...)
-			requirements.AllPermissions = append(requirements.AllPermissions, r.AllPermissions...)
-		}
-		authorized, err := s.internal.auth.Authorize(r, requirements)
+		authorized, err := s.internal.auth.Authorize(r, permission)
 		if err != nil {
 			s.Log.Error("failed to authorize request", slog.Any("error", err))
 			sendResponse(w, 500, "internal server error")
 			return
 		}
 		if !authorized {
-			sendResponse(w, 403, "forbidden")
+			sendResponse(w, 403, fmt.Sprintf("Forbidden: Missing required permission '%s'", permission))
 			return
 		}
 
@@ -412,20 +403,20 @@ func (s *Service) AddPublicEndpoint(method, relativePath string, handler Endpoin
 
 // AddServiceEndpoint registers an HTTP endpoint that requires authentication and is restricted to service requests only.
 // It first authenticates the request, ensuring that only valid credentials are allowed, and then verifies
-// that the request comes specifically from a trusted service before invoking the handler.
+// that the request comes specifically from a trusted service.
 //
 // If the service was initialized without an AuthProvider, it logs a fatal error and exits.
 // If authentication fails, a 401 Unauthorized response is returned. If the request is not verified as coming
 // from a service, a 403 Forbidden response is returned indicating that access is restricted to services.
 //
-// Optionally, authorization requirements (roles or permissions) can be specified and are checked after
-// authentication. If the authorization requirements are not met, a 403 Forbidden response is returned.
+// Optionally, a permission can be specified and is checked after authentication. If the permission requirements
+// is not met, a 403 Forbidden response is returned.
 //
 // The handler function receives the Service instance and the HTTP request, and returns an HTTPResponse.
 // In case of an internal error during processing, a 500 Internal Server Error is returned.
 // This endpoint is intended for use by other services and ensures only authenticated and verified service requests
 // are permitted.
-func (s *Service) AddServiceEndpoint(method, relativePath string, handler EndpointHandler, authRequirements ...auth.AuthRequirements) {
+func (s *Service) AddServiceEndpoint(method, relativePath string, handler EndpointHandler, permission string) {
 
 	// Confirm an AuthProvider exists
 	if s.internal.auth == nil {
@@ -459,19 +450,14 @@ func (s *Service) AddServiceEndpoint(method, relativePath string, handler Endpoi
 		}
 
 		// Authorize the request
-		requirements := auth.AuthRequirements{}
-		for _, r := range authRequirements {
-			requirements.AnyRole = append(requirements.AnyRole, r.AnyRole...)
-			requirements.AllPermissions = append(requirements.AllPermissions, r.AllPermissions...)
-		}
-		authorized, err := s.internal.auth.Authorize(r, requirements)
+		authorized, err := s.internal.auth.Authorize(r, permission)
 		if err != nil {
 			s.Log.Error("failed to authorize request", slog.Any("error", err))
 			sendResponse(w, 500, "internal server error")
 			return
 		}
 		if !authorized {
-			sendResponse(w, 403, "forbidden")
+			sendResponse(w, 403, fmt.Sprintf("Forbidden: Missing required permission '%s'", permission))
 			return
 		}
 

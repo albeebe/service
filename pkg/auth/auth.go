@@ -132,34 +132,17 @@ func (a *Auth) Authenticate(r *http.Request) (authenticated bool, reason string,
 	return isValid, reason, nil
 }
 
-// Authorize checks if the request meets the given roles and permissions.
+// Authorize checks if the request meets the given permission.
 // Returns true if authorized, false otherwise, and an error if the request is invalid or the check fails.
-func (a *Auth) Authorize(r *http.Request, authRequirements AuthRequirements) (authorized bool, err error) {
+func (a *Auth) Authorize(r *http.Request, permission string) (authorized bool, err error) {
 
 	// Ensure the request is not
 	if r == nil {
 		return false, errors.New("request is nil")
 	}
 
-	// If no roles or permissions are required, authorize the request immediately
-	if len(authRequirements.AnyRole) == 0 && len(authRequirements.AllPermissions) == 0 {
-		return true, nil
-	}
-
-	// Delegate the authorization check to the auth provider using the provided requirements
-	return a.authProvider.AuthorizeRequest(r, authRequirements)
-}
-
-// AnyRole creates an AuthRequirements struct specifying that at least
-// one of the provided roles must be present for authorization.
-func AnyRole(roles ...string) AuthRequirements {
-	return AuthRequirements{AnyRole: roles}
-}
-
-// AllPermissions creates an AuthRequirements struct specifying that
-// all the provided permissions must be granted for authorization.
-func AllPermissions(permissions ...string) AuthRequirements {
-	return AuthRequirements{AllPermissions: permissions}
+	// Delegate the authorization check to the auth provider
+	return a.authProvider.AuthorizeRequest(r, permission)
 }
 
 // IsServiceRequest checks whether the given HTTP request originates from a service.

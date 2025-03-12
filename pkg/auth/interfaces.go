@@ -28,9 +28,9 @@ import (
 )
 
 type AuthProvider interface {
-	// AuthorizeRequest checks if the request meets the specified authorization requirements.
+	// AuthorizeRequest checks if the request meets the specified authorization requirement.
 	// It returns true if the request is authorized, otherwise false, and an error if something goes wrong.
-	AuthorizeRequest(r *http.Request, authRequirements AuthRequirements) (isAuthorized bool, err error)
+	AuthorizeRequest(r *http.Request, permission string) (isAuthorized bool, err error)
 
 	// IsServiceRequest checks whether the given HTTP request originates from a service.
 	// It returns true if the request is identified as a service request, otherwise false.
