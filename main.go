@@ -244,7 +244,12 @@ func (s *Service) IsRequestFromService(r *http.Request) bool {
 // If authentication fails, a 401 Unauthorized response is returned. If authorization
 // requirements are provided and the request fails authorization, a 403 Forbidden response is returned.
 // In case of an internal error during processing, a 500 Internal Server Error is returned.
-func (s *Service) AddAuthenticatedEndpoint(method, relativePath string, handler EndpointHandler, permission string) {
+func (s *Service) AddAuthenticatedEndpoint(method, relativePath, permission string, handler EndpointHandler) {
+
+	// Sanitize the parameters
+	method = strings.TrimSpace(method)
+	relativePath = strings.TrimSpace(relativePath)
+	permission = strings.TrimSpace(permission)
 
 	// Confirm an AuthProvider exists
 	if s.internal.auth == nil {
@@ -307,6 +312,9 @@ func (s *Service) AddAuthenticatedEndpoint(method, relativePath string, handler 
 // while in local or non-production environments, request verification is skipped.
 func (s *Service) AddCloudTaskEndpoint(relativePath string, handler EndpointHandler) {
 
+	// Sanitize the parameters
+	relativePath = strings.TrimSpace(relativePath)
+
 	// wrappedHandler is the middleware that processes the incoming request.
 	wrappedHandler := func(w http.ResponseWriter, r *http.Request) {
 
@@ -341,6 +349,9 @@ func (s *Service) AddCloudTaskEndpoint(relativePath string, handler EndpointHand
 // incoming Google Cloud Scheduler requests. In production, it verifies the authenticity of the
 // request, while in local or non-production environments, request verification is skipped.
 func (s *Service) AddCloudSchedulerEndpoint(relativePath string, handler EndpointHandler) {
+
+	// Sanitize the parameters
+	relativePath = strings.TrimSpace(relativePath)
 
 	// wrappedHandler is the middleware that processes the incoming request.
 	wrappedHandler := func(w http.ResponseWriter, r *http.Request) {
@@ -382,6 +393,10 @@ func (s *Service) AddCloudSchedulerEndpoint(relativePath string, handler Endpoin
 // and terminate the program.
 func (s *Service) AddPublicEndpoint(method, relativePath string, handler EndpointHandler) {
 
+	// Sanitize the parameters
+	method = strings.TrimSpace(method)
+	relativePath = strings.TrimSpace(relativePath)
+
 	// Wrap the handler, so we can pass the service to it and handle sending the response
 	wrappedHandler := func(w http.ResponseWriter, r *http.Request) {
 		resp := handler(s, r)
@@ -416,7 +431,12 @@ func (s *Service) AddPublicEndpoint(method, relativePath string, handler Endpoin
 // In case of an internal error during processing, a 500 Internal Server Error is returned.
 // This endpoint is intended for use by other services and ensures only authenticated and verified service requests
 // are permitted.
-func (s *Service) AddServiceEndpoint(method, relativePath string, handler EndpointHandler, permission string) {
+func (s *Service) AddServiceEndpoint(method, relativePath, permission string, handler EndpointHandler) {
+
+	// Sanitize the parameters
+	method = strings.TrimSpace(method)
+	relativePath = strings.TrimSpace(relativePath)
+	permission = strings.TrimSpace(permission)
 
 	// Confirm an AuthProvider exists
 	if s.internal.auth == nil {
@@ -485,6 +505,9 @@ func (s *Service) AddServiceEndpoint(method, relativePath string, handler Endpoi
 // local or non-production environments, request verification is skipped.
 func (s *Service) AddPubSubEndpoint(relativePath string, handler EndpointHandler) {
 
+	// Sanitize the parameters
+	relativePath = strings.TrimSpace(relativePath)
+
 	// wrappedHandler is the middleware that processes the incoming request.
 	wrappedHandler := func(w http.ResponseWriter, r *http.Request) {
 
@@ -522,6 +545,9 @@ func (s *Service) AddPubSubEndpoint(relativePath string, handler EndpointHandler
 // middleware to upgrade HTTP requests to WebSocket connections, and automatically closes the connection
 // when the handler completes.
 func (s *Service) AddWebsocketEndpoint(relativePath string, handler WebsocketHandler) {
+
+	// Sanitize the parameters
+	relativePath = strings.TrimSpace(relativePath)
 
 	var upgrader = websocket.Upgrader{
 		ReadBufferSize:  1024,
