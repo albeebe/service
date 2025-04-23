@@ -345,6 +345,44 @@ func (s *Service) AddCloudTaskEndpoint(relativePath string, handler EndpointHand
 	}
 }
 
+// AddCloudWorkflowEndpoint registers a new POST endpoint at the specified relativePath to handle
+// incoming Google Cloud Workflow requests. In production, it verifies the authenticity of the request,
+// while in local or non-production environments, request verification is skipped.
+func (s *Service) AddCloudWorkflowEndpoint(relativePath string, handler EndpointHandler) {
+
+	// Sanitize the parameters
+	relativePath = strings.TrimSpace(relativePath)
+
+	// wrappedHandler is the middleware that processes the incoming request.
+	wrappedHandler := func(w http.ResponseWriter, r *http.Request) {
+
+		// Verify the request if running in a production environment.
+		// This step ensures that the request comes from Google Cloud Workflows.
+		if runningInProduction() {
+			if err := verifyGoogleRequest(s.Context, r); err != nil {
+				// Respond with a 403 Forbidden status if verification fails.
+				sendResponse(w, http.StatusForbidden, "forbidden: failed to validate Google ID token")
+				return
+			}
+		}
+
+		// Invoke the provided handler function with the request.
+		resp := handler(s, r)
+		if resp == nil {
+			resp = Text(500, "internal server error")
+		}
+		if err := router.SendResponse(w, resp.StatusCode, resp.Headers, resp.Body); err != nil {
+			s.Log.Error("failed to send response", slog.Any("error", err))
+		}
+	}
+
+	// Register the wrapped handler to the router to handle POST requests on the given relativePath.
+	// Log a fatal error if the handler registration fails.
+	if err := s.internal.router.RegisterHandler("POST", relativePath, wrappedHandler); err != nil {
+		s.Log.Error("failed to add Cloud Workflow", slog.Any("error", err), slog.Any("relative_path", relativePath))
+	}
+}
+
 // AddCloudSchedulerEndpoint registers a new POST endpoint at the specified relativePath to handle
 // incoming Google Cloud Scheduler requests. In production, it verifies the authenticity of the
 // request, while in local or non-production environments, request verification is skipped.
