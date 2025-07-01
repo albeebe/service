@@ -620,13 +620,13 @@ func (s *Service) AuthClient() (*http.Client, error) {
 
 	// Check that the service has an initialized AuthProvider
 	if s.internal.auth == nil {
-		return nil, errors.New("AddServiceEndpoint requires the service to be initialized with an AuthProvider")
+		return nil, errors.New("AuthClient requires the service to be initialized with an AuthProvider")
 	}
 
 	// Retrieve the http.Client from the AuthProvider
 	client, err := s.internal.auth.NewAuthClient()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create client: %w", err)
+		return nil, fmt.Errorf("failed to create auth client: %w", err)
 	}
 
 	return client, nil
