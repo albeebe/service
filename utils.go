@@ -30,10 +30,12 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"reflect"
 	"strings"
 
 	"cloud.google.com/go/compute/metadata"
 	"github.com/albeebe/service/pkg/router"
+	"github.com/go-playground/validator/v10"
 	"google.golang.org/api/idtoken"
 )
 
@@ -52,7 +54,7 @@ func Text(statusCode int, text string) *HTTPResponse {
 // with the given status code and the formatted plain text body.
 // It is a variant of the Text function that supports formatted text using fmt.Sprintf.
 func Textf(statusCode int, text string, args ...any) *HTTPResponse {
-	return Text(statusCode, fmt.Sprintf(text, args))
+	return Text(statusCode, fmt.Sprintf(text, args...))
 }
 
 // JSON sets the HTTP response with the provided status code and a JSON-encoded
@@ -82,6 +84,11 @@ func JSON(statusCode int, obj interface{}) *HTTPResponse {
 // InternalServerError returns an HTTP 500 response with a standard "internal server error" message.
 func InternalServerError() *HTTPResponse {
 	return Text(500, "internal server error")
+}
+
+// NotImplemented returns an HTTP 501 response with a standard "not implemented" message.
+func NotImplemented() *HTTPResponse {
+	return Text(501, "not implemented")
 }
 
 // UnmarshalJSONBody reads the JSON-encoded body of an HTTP request and unmarshals it into the provided target.
@@ -130,6 +137,53 @@ func runningInProduction() bool {
 func sendResponse(w http.ResponseWriter, statusCode int, message string) {
 	response := Text(statusCode, message)
 	router.SendResponse(w, response.StatusCode, response.Headers, response.Body)
+}
+
+// ValidateStruct validates a struct (or pointer to struct) using `validate` tags.
+// It returns a slice of errors (nil if the struct is valid). Field names in
+// error messages prefer the JSON tag when present.
+func ValidateStruct(s any) []error {
+	v := validator.New()
+
+	// Prefer JSON tag names in error messages (e.g., "first_name" instead of "FirstName")
+	v.RegisterTagNameFunc(func(fld reflect.StructField) string {
+		name := fld.Tag.Get("json")
+		if name == "-" || name == "" {
+			return fld.Name
+		}
+		if i := strings.IndexByte(name, ','); i >= 0 {
+			name = name[:i]
+		}
+		if name == "" {
+			return fld.Name
+		}
+		return name
+	})
+
+	if err := v.Struct(s); err != nil {
+		var verrs validator.ValidationErrors
+		if !errors.As(err, &verrs) {
+			// Non-validation error (e.g., invalid input to validator)
+			return []error{err}
+		}
+
+		out := make([]error, 0, len(verrs))
+		for _, fe := range verrs {
+			field := fe.Field()
+			switch fe.Tag() {
+			case "required":
+				out = append(out, fmt.Errorf("%s is required", field))
+			case "min":
+				out = append(out, fmt.Errorf("%s must be at least %s character(s)", field, fe.Param()))
+			case "max":
+				out = append(out, fmt.Errorf("%s must be at most %s character(s)", field, fe.Param()))
+			default:
+				out = append(out, fmt.Errorf("%s failed %s validation", field, fe.Tag()))
+			}
+		}
+		return out
+	}
+	return nil
 }
 
 // verifyGoogleRequest validates an incoming HTTP request by checking its Authorization
