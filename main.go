@@ -639,6 +639,9 @@ func (s *Service) AuthClient() (*http.Client, error) {
 //
 // Parameters:
 //   - queue: The fully qualified name of the Cloud Tasks queue where the task will be created.
+//   - name:  (Optional) A unique identifier for the task used to ensure deduplication.
+//     If omitted, Cloud Tasks automatically generates a unique name. Supplying
+//     a name allows you to safely retry task creation without creating duplicates.
 //   - callbackURL: The URL that will receive the HTTP request when the task is executed.
 //   - body: The request payload to be sent in the task's HTTP request body.
 //   - delay: The duration to wait before the task is executed (schedules the task in the future).
@@ -649,7 +652,7 @@ func (s *Service) AuthClient() (*http.Client, error) {
 //
 // The function uses the CloudTasksClient to create a new task with the specified parameters.
 // The task is authenticated using an OIDC token associated with the configured service account.
-func (s *Service) CreateCloudTask(queue, callbackURL string, body []byte, delay, timeout time.Duration) error {
+func (s *Service) CreateCloudTask(queue, name, callbackURL string, body []byte, delay, timeout time.Duration) error {
 	// Configure the task
 	task := taskspb.Task{
 		MessageType: &taskspb.Task_HttpRequest{
@@ -667,6 +670,7 @@ func (s *Service) CreateCloudTask(queue, callbackURL string, body []byte, delay,
 		},
 		ScheduleTime:     timestamppb.New(time.Now().Add(delay)),
 		DispatchDeadline: durationpb.New(timeout),
+		Name:             name,
 	}
 
 	// Create the task
