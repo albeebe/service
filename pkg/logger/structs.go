@@ -30,9 +30,11 @@ import (
 
 // Config holds configuration details for setting up logging.
 type Config struct {
-	GCPProjectID string     // GCPProjectID is the Google Cloud Project ID where logs will be sent.
-	LogName      string     // LogName is the name of the log stream where entries will be written.
-	Level        slog.Level // Level is the minimum log level that will be captured (e.g., DEBUG, INFO).
+	GCPProjectID   string     // GCPProjectID is the Google Cloud Project ID where logs will be sent.
+	ServiceName    string     // ServiceName identifies the service in Error Reporting and groups related errors together.
+	ServiceVersion string     // ServiceVersion specifies the version or revision of the service for Error Reporting.
+	LogName        string     // LogName is the name of the log stream where entries will be written.
+	Level          slog.Level // Level is the minimum log level that will be captured (e.g., DEBUG, INFO).
 }
 
 // DevelopmentHandler is a custom handler for slog used in development environments.
@@ -43,6 +45,8 @@ type DevelopmentHandler struct {
 
 // GoogleCloudLoggingHandler is a custom handler for slog used to send logs to Google Cloud Logging.
 type GoogleCloudLoggingHandler struct {
-	logger *logging.Logger // Logger is the Google Cloud Logger instance used to send log entries.
-	level  slog.Level      // Level is the minimum log level at which logs will be sent to Google Cloud.
+	logger         *logging.Logger // logger is the Google Cloud Logger instance used to send log entries.
+	level          slog.Level      // level is the minimum log level at which logs will be sent to Google Cloud.
+	serviceName    string          // serviceName identifies the service in Error Reporting and groups related errors together.
+	serviceVersion string          // serviceVersion specifies the version or revision of the service for Error Reporting.
 }

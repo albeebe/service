@@ -51,9 +51,11 @@ func (s *Service) initializeLogger() error {
 	if runningInProduction() {
 		// Set up Google Cloud logging for production
 		s.Log, err = logger.NewGoogleCloudLogger(s.Context, logger.Config{
-			GCPProjectID: s.internal.config.GCPProjectID,
-			LogName:      "service-log",
-			Level:        slog.LevelInfo, // Use Info level for production
+			GCPProjectID:   s.internal.config.GCPProjectID,
+			LogName:        "service-log",
+			Level:          slog.LevelInfo, // Use Info level for production
+			ServiceName:    s.Name,
+			ServiceVersion: "1.0",
 		})
 	} else {
 		// Set up development logging for non-production environments
