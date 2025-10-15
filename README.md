@@ -99,7 +99,7 @@ func main() {
     },
     Terminating: func(err error) {
       if err != nil {
-        s.Log.Info("Service terminating with error...", slog.Any("error", err))
+        s.Log.Info("Service terminating with error...", slog.String("error", err.Error()))
       } else {
         s.Log.Info("Service terminating...")
       }
