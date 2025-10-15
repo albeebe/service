@@ -27,6 +27,7 @@ import (
 	"log/slog"
 	"runtime"
 	"runtime/debug"
+	"strings"
 
 	"cloud.google.com/go/logging"
 )
@@ -45,59 +46,44 @@ func (h *GoogleCloudLoggingHandler) Enabled(_ context.Context, level slog.Level)
 // NOTE: For Error Reporting ingestion, we add `serviceContext` and `context.reportLocation`
 // when severity is ERROR or higher. We also set Entry.SourceLocation.
 func (h *GoogleCloudLoggingHandler) Handle(ctx context.Context, r slog.Record) error {
-	// 1) Collect attributes from slog.Record
+	// 1) attributes
 	attributes := make(map[string]any)
 	r.Attrs(func(a slog.Attr) bool {
 		attributes[a.Key] = a.Value.Any()
 		return true
 	})
 
-	// 2) Compute source location (prefer slog's source if available; fallback to runtime.Caller)
-	var file string
-	var line int
-	var function string
-	if src := r.Source(); src != nil { // available if AddSource: true on the slog logger
-		file = src.File
-		line = src.Line
-		function = src.Function
-	} else if pc, f, l, ok := runtime.Caller(5); ok { // adjust depth if needed
-		file = f
-		line = l
-		if fn := runtime.FuncForPC(pc); fn != nil {
-			function = fn.Name()
-		}
-	}
+	// 2) source info (Go-version-safe)
+	file, line, function := firstAppFrame()
 
-	// 3) If error, attach a stack (helps with grouping even if reportLocation is present)
+	// 3) stack for errors
 	if r.Level >= slog.LevelError {
-		// Only add if caller didn't already set one
 		if _, ok := attributes["stack_trace"]; !ok {
 			attributes["stack_trace"] = string(debug.Stack())
 		}
 	}
 
-	// 4) Base payload (always present)
+	// 4) payload
 	payload := map[string]any{
 		"message":    r.Message,
 		"attributes": attributes,
 	}
 
-	// 5) For ERROR and above, add the fields that Error Reporting expects
+	// 5) serviceContext + reportLocation for Error Reporting
 	if r.Level >= slog.LevelError {
-		// Service name/version: keep the service stable across releases
 		service := h.serviceName
 		if service == "" {
 			service = "unknown-service"
 		}
 		version := h.serviceVersion
+		if version == "" {
+			version = "0"
+		}
 
 		payload["serviceContext"] = map[string]any{
 			"service": service,
 			"version": version,
 		}
-
-		// Either a stack trace in message OR context.reportLocation is required.
-		// We provide reportLocation (stack trace is already in attributes).
 		payload["context"] = map[string]any{
 			"reportLocation": map[string]any{
 				"filePath":     file,
@@ -107,12 +93,11 @@ func (h *GoogleCloudLoggingHandler) Handle(ctx context.Context, r slog.Record) e
 		}
 	}
 
-	// 6) Build and send the Logging entry
+	// 6) log (omit SourceLocation for broad compatibility)
 	entry := logging.Entry{
 		Severity: h.mapSeverity(r.Level),
 		Payload:  payload,
 	}
-
 	h.logger.Log(entry)
 	return nil
 }
@@ -154,4 +139,33 @@ func (h *GoogleCloudLoggingHandler) mapSeverity(level slog.Level) logging.Severi
 	default:
 		return logging.Default
 	}
+}
+
+// firstAppFrame returns the first stack frame outside slog and this logger package.
+func firstAppFrame() (file string, line int, function string) {
+	const maxDepth = 32
+	var pcs [maxDepth]uintptr
+	n := runtime.Callers(2, pcs[:]) // skip runtime.Callers + firstAppFrame
+	frames := runtime.CallersFrames(pcs[:n])
+
+	for {
+		f, more := frames.Next()
+		fn := f.Function
+		if fn == "" {
+			if !more {
+				break
+			}
+			continue
+		}
+		// Skip frames from slog and this logger package
+		if strings.Contains(fn, "log/slog") ||
+			strings.Contains(fn, "github.com/albeebe/service/pkg/logger") {
+			if !more {
+				break
+			}
+			continue
+		}
+		return f.File, f.Line, fn
+	}
+	return "", 0, ""
 }
