@@ -168,7 +168,7 @@ func (s *Service) Run(state State) {
 		return
 	case err := <-teardownComplete:
 		if err != nil {
-			s.Log.Error("teardown completed with an error", slog.Any("error", err))
+			s.Log.Error("teardown completed with an error", slog.String("error", err.Error()))
 		}
 	}
 }
@@ -263,7 +263,7 @@ func (s *Service) AddAuthenticatedEndpoint(method, relativePath, permission stri
 		// Authenticate the request
 		authenticated, reason, err := s.internal.auth.Authenticate(r)
 		if err != nil {
-			s.Log.Error("failed to authenticated request", slog.Any("error", err))
+			s.Log.Error("failed to authenticated request", slog.String("error", err.Error()))
 			sendResponse(w, 500, "internal server error")
 			return
 		}
@@ -279,7 +279,7 @@ func (s *Service) AddAuthenticatedEndpoint(method, relativePath, permission stri
 		// Authorize the request
 		authorized, err := s.internal.auth.Authorize(r, permission)
 		if err != nil {
-			s.Log.Error("failed to authorize request", slog.Any("error", err))
+			s.Log.Error("failed to authorize request", slog.String("error", err.Error()))
 			sendResponse(w, 500, "internal server error")
 			return
 		}
@@ -295,14 +295,14 @@ func (s *Service) AddAuthenticatedEndpoint(method, relativePath, permission stri
 			return
 		}
 		if err := router.SendResponse(w, resp.StatusCode, resp.Headers, resp.Body); err != nil {
-			s.Log.Error("failed to send response", slog.Any("error", err))
+			s.Log.Error("failed to send response", slog.String("error", err.Error()))
 		}
 	}
 
 	// Register the wrapped handler to the router to handle requests on the given relativePath.
 	// Log a fatal error if the handler registration fails.
 	if err := s.internal.router.RegisterHandler(method, relativePath, wrappedHandler); err != nil {
-		s.Log.Error("failed to register handler", slog.Any("error", err), slog.Any("method", method), slog.Any("relative_path", relativePath))
+		s.Log.Error("failed to register handler", slog.String("error", err.Error()), slog.String("method", method), slog.String("relative_path", relativePath))
 		os.Exit(1)
 	}
 }
@@ -334,14 +334,14 @@ func (s *Service) AddCloudTaskEndpoint(relativePath string, handler EndpointHand
 			resp = Text(500, "internal server error")
 		}
 		if err := router.SendResponse(w, resp.StatusCode, resp.Headers, resp.Body); err != nil {
-			s.Log.Error("failed to send response", slog.Any("error", err))
+			s.Log.Error("failed to send response", slog.String("error", err.Error()))
 		}
 	}
 
 	// Register the wrapped handler to the router to handle POST requests on the given relativePath.
 	// Log a fatal error if the handler registration fails.
 	if err := s.internal.router.RegisterHandler("POST", relativePath, wrappedHandler); err != nil {
-		s.Log.Error("failed to add Cloud Task", slog.Any("error", err), slog.Any("relative_path", relativePath))
+		s.Log.Error("failed to add Cloud Task", slog.String("error", err.Error()), slog.String("relative_path", relativePath))
 	}
 }
 
@@ -372,14 +372,14 @@ func (s *Service) AddCloudWorkflowEndpoint(relativePath string, handler Endpoint
 			resp = Text(500, "internal server error")
 		}
 		if err := router.SendResponse(w, resp.StatusCode, resp.Headers, resp.Body); err != nil {
-			s.Log.Error("failed to send response", slog.Any("error", err))
+			s.Log.Error("failed to send response", slog.String("error", err.Error()))
 		}
 	}
 
 	// Register the wrapped handler to the router to handle POST requests on the given relativePath.
 	// Log a fatal error if the handler registration fails.
 	if err := s.internal.router.RegisterHandler("POST", relativePath, wrappedHandler); err != nil {
-		s.Log.Error("failed to add Cloud Workflow", slog.Any("error", err), slog.Any("relative_path", relativePath))
+		s.Log.Error("failed to add Cloud Workflow", slog.String("error", err.Error()), slog.String("relative_path", relativePath))
 	}
 }
 
@@ -410,14 +410,14 @@ func (s *Service) AddCloudSchedulerEndpoint(relativePath string, handler Endpoin
 			resp = Text(500, "internal server error")
 		}
 		if err := router.SendResponse(w, resp.StatusCode, resp.Headers, resp.Body); err != nil {
-			s.Log.Error("failed to send response", slog.Any("error", err))
+			s.Log.Error("failed to send response", slog.String("error", err.Error()))
 		}
 	}
 
 	// Register the wrapped handler to the router to handle POST requests on the given relativePath.
 	// Log a fatal error if the handler registration fails.
 	if err := s.internal.router.RegisterHandler("POST", relativePath, wrappedHandler); err != nil {
-		s.Log.Error("failed to add Cronjob", slog.Any("error", err), slog.Any("relative_path", relativePath))
+		s.Log.Error("failed to add Cronjob", slog.String("error", err.Error()), slog.String("relative_path", relativePath))
 		os.Exit(1)
 
 	}
@@ -442,14 +442,14 @@ func (s *Service) AddPublicEndpoint(method, relativePath string, handler Endpoin
 			resp = Text(500, "internal server error")
 		}
 		if err := router.SendResponse(w, resp.StatusCode, resp.Headers, resp.Body); err != nil {
-			s.Log.Error("failed to send response", slog.Any("error", err))
+			s.Log.Error("failed to send response", slog.String("error", err.Error()))
 		}
 	}
 
 	// Register the wrapped handler to the router to handle requests on the given relativePath.
 	// Log a fatal error if the handler registration fails.
 	if err := s.internal.router.RegisterHandler(method, relativePath, wrappedHandler); err != nil {
-		s.Log.Error("failed to register handler", slog.Any("error", err), slog.Any("method", method), slog.Any("relative_path", relativePath))
+		s.Log.Error("failed to register handler", slog.String("error", err.Error()), slog.String("method", method), slog.String("relative_path", relativePath))
 		os.Exit(1)
 	}
 }
@@ -488,7 +488,7 @@ func (s *Service) AddServiceEndpoint(method, relativePath, permission string, ha
 		// Authenticate the request
 		authenticated, reason, err := s.internal.auth.Authenticate(r)
 		if err != nil {
-			s.Log.Error("failed to authenticated request", slog.Any("error", err))
+			s.Log.Error("failed to authenticated request", slog.String("error", err.Error()))
 			sendResponse(w, 500, "internal server error")
 			return
 		}
@@ -510,7 +510,7 @@ func (s *Service) AddServiceEndpoint(method, relativePath, permission string, ha
 		// Authorize the request
 		authorized, err := s.internal.auth.Authorize(r, permission)
 		if err != nil {
-			s.Log.Error("failed to authorize request", slog.Any("error", err))
+			s.Log.Error("failed to authorize request", slog.String("error", err.Error()))
 			sendResponse(w, 500, "internal server error")
 			return
 		}
@@ -526,14 +526,14 @@ func (s *Service) AddServiceEndpoint(method, relativePath, permission string, ha
 			return
 		}
 		if err := router.SendResponse(w, resp.StatusCode, resp.Headers, resp.Body); err != nil {
-			s.Log.Error("failed to send response", slog.Any("error", err))
+			s.Log.Error("failed to send response", slog.String("error", err.Error()))
 		}
 	}
 
 	// Register the wrapped handler to the router to handle requests on the given relativePath.
 	// Log a fatal error if the handler registration fails.
 	if err := s.internal.router.RegisterHandler(method, relativePath, wrappedHandler); err != nil {
-		s.Log.Error("failed to register handler", slog.Any("error", err), slog.Any("method", method), slog.Any("relative_path", relativePath))
+		s.Log.Error("failed to register handler", slog.String("error", err.Error()), slog.String("method", method), slog.String("relative_path", relativePath))
 		os.Exit(1)
 	}
 }
@@ -566,14 +566,14 @@ func (s *Service) AddPubSubEndpoint(relativePath string, handler EndpointHandler
 			return
 		}
 		if err := router.SendResponse(w, resp.StatusCode, resp.Headers, resp.Body); err != nil {
-			s.Log.Error("failed to send response", slog.Any("error", err))
+			s.Log.Error("failed to send response", slog.String("error", err.Error()))
 		}
 	}
 
 	// Register the wrapped handler to the router to handle POST requests on the given relativePath.
 	// Log a fatal error if the handler registration fails.
 	if err := s.internal.router.RegisterHandler("POST", relativePath, wrappedHandler); err != nil {
-		s.Log.Error("failed to register handler", slog.Any("error", err), slog.Any("relative_path", relativePath))
+		s.Log.Error("failed to register handler", slog.String("error", err.Error()), slog.String("relative_path", relativePath))
 		os.Exit(1)
 	}
 }
@@ -599,7 +599,7 @@ func (s *Service) AddWebsocketEndpoint(relativePath string, handler WebsocketHan
 	wrappedHandler := func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
-			s.Log.Error("failed to upgrade request to a websocket", slog.Any("error", err), slog.Any("relative_path", relativePath))
+			s.Log.Error("failed to upgrade request to a websocket", slog.String("error", err.Error()), slog.String("relative_path", relativePath))
 			return
 		}
 		defer conn.Close()
@@ -609,7 +609,7 @@ func (s *Service) AddWebsocketEndpoint(relativePath string, handler WebsocketHan
 	// Register the wrapped handler to the router to handle GET requests on the given relativePath.
 	// Log a fatal error if the handler registration fails.
 	if err := s.internal.router.RegisterHandler("GET", relativePath, wrappedHandler); err != nil {
-		s.Log.Error("failed to register websocket handler", slog.Any("error", err), slog.Any("relative_path", relativePath))
+		s.Log.Error("failed to register websocket handler", slog.String("error", err.Error()), slog.String("relative_path", relativePath))
 		os.Exit(1)
 	}
 }

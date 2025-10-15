@@ -202,7 +202,7 @@ func (s *Service) startAuthService() {
 		select {
 		case err := <-s.internal.auth.Start():
 			if err != nil {
-				s.Log.Error("failed to start auth service", slog.Any("error", err))
+				s.Log.Error("failed to start auth service", slog.String("error", err.Error()))
 			}
 		case <-s.Context.Done():
 			return
@@ -276,10 +276,10 @@ func (s *Service) teardown(timeout time.Duration) error {
 	// and flushing logs last, we ensure that any necessary resources remain available
 	// and that all logged messages are written out before completing the overall shutdown.
 	if err := s.teardownCloudSQL(); err != nil {
-		s.Log.Error("failed to tear down CloudSQL", slog.Any("error", err))
+		s.Log.Error("failed to tear down CloudSQL", slog.String("error", err.Error()))
 	}
 	if err := s.flushLogger(); err != nil {
-		s.Log.Error("failed to flush the logger", slog.Any("error", err))
+		s.Log.Error("failed to flush the logger", slog.String("error", err.Error()))
 	}
 
 	return finalErr
