@@ -25,6 +25,7 @@ package logger
 import (
 	"context"
 	"log/slog"
+	"runtime"
 	"runtime/debug"
 
 	"cloud.google.com/go/logging"
@@ -40,31 +41,78 @@ func (h *GoogleCloudLoggingHandler) Enabled(_ context.Context, level slog.Level)
 // It extracts the log message and any associated structured attributes (key-value pairs),
 // maps the slog log level to Google Cloud Logging severity, and forwards the log entry
 // to Google Cloud Logging.
+//
+// NOTE: For Error Reporting ingestion, we add `serviceContext` and `context.reportLocation`
+// when severity is ERROR or higher. We also set Entry.SourceLocation.
 func (h *GoogleCloudLoggingHandler) Handle(ctx context.Context, r slog.Record) error {
-	// Create a map to hold the structured data (attributes)
-	attributes := make(map[string]interface{})
-
-	// Collect attributes from slog.Record
+	// 1) Collect attributes from slog.Record
+	attributes := make(map[string]any)
 	r.Attrs(func(a slog.Attr) bool {
 		attributes[a.Key] = a.Value.Any()
-		return true // Continue iterating over all attributes
+		return true
 	})
 
-	// Add stack trace to attributes for errors
-	if r.Level == slog.LevelError {
-		attributes["stack_trace"] = string(debug.Stack())
+	// 2) Compute source location (prefer slog's source if available; fallback to runtime.Caller)
+	var file string
+	var line int
+	var function string
+	if src := r.Source(); src != nil { // available if AddSource: true on the slog logger
+		file = src.File
+		line = src.Line
+		function = src.Function
+	} else if pc, f, l, ok := runtime.Caller(5); ok { // adjust depth if needed
+		file = f
+		line = l
+		if fn := runtime.FuncForPC(pc); fn != nil {
+			function = fn.Name()
+		}
 	}
 
-	// Create a Google Cloud Logging entry with the log message and structured data
+	// 3) If error, attach a stack (helps with grouping even if reportLocation is present)
+	if r.Level >= slog.LevelError {
+		// Only add if caller didn't already set one
+		if _, ok := attributes["stack_trace"]; !ok {
+			attributes["stack_trace"] = string(debug.Stack())
+		}
+	}
+
+	// 4) Base payload (always present)
+	payload := map[string]any{
+		"message":    r.Message,
+		"attributes": attributes,
+	}
+
+	// 5) For ERROR and above, add the fields that Error Reporting expects
+	if r.Level >= slog.LevelError {
+		// Service name/version: keep the service stable across releases
+		service := h.serviceName
+		if service == "" {
+			service = "unknown-service"
+		}
+		version := h.serviceVersion
+
+		payload["serviceContext"] = map[string]any{
+			"service": service,
+			"version": version,
+		}
+
+		// Either a stack trace in message OR context.reportLocation is required.
+		// We provide reportLocation (stack trace is already in attributes).
+		payload["context"] = map[string]any{
+			"reportLocation": map[string]any{
+				"filePath":     file,
+				"lineNumber":   line,
+				"functionName": function,
+			},
+		}
+	}
+
+	// 6) Build and send the Logging entry
 	entry := logging.Entry{
-		Severity: h.mapSeverity(r.Level), // Map slog levels to Google Cloud severity levels
-		Payload: map[string]interface{}{
-			"message":    r.Message,  // Add the message as part of the payload
-			"attributes": attributes, // Add structured data as part of the payload
-		},
+		Severity: h.mapSeverity(r.Level),
+		Payload:  payload,
 	}
 
-	// Log the entry to Google Cloud
 	h.logger.Log(entry)
 	return nil
 }

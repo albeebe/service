@@ -73,8 +73,10 @@ func NewGoogleCloudLogger(ctx context.Context, config Config) (*slog.Logger, err
 
 	// Create a custom slog handler for Google Cloud Logging
 	handler := &GoogleCloudLoggingHandler{
-		logger: googleLogger,
-		level:  config.Level, // Set the logging level based on the provided config
+		logger:         googleLogger,
+		level:          config.Level, // Set the logging level based on the provided config
+		serviceName:    config.ServiceName,
+		serviceVersion: config.ServiceVersion,
 	}
 
 	// Return a new slog.Logger using the custom Google Cloud Logging handler
