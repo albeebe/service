@@ -135,6 +135,15 @@ func (s *Service) setupCloudSQL() (err error) {
 		return fmt.Errorf("failed to open connection: %w", err)
 	}
 
+	// Configure connection pool to handle Cloud SQL idle disconnects.
+	// Cloud SQL closes connections after ~10 minutes of inactivity.
+	// Without these settings, the pool serves stale connections that
+	// return "invalid connection" errors across all services.
+	s.DB.SetConnMaxLifetime(5 * time.Minute)
+	s.DB.SetConnMaxIdleTime(3 * time.Minute)
+	s.DB.SetMaxOpenConns(25)
+	s.DB.SetMaxIdleConns(5)
+
 	// Verify the connection to the database
 	if err := s.DB.Ping(); err != nil {
 		return fmt.Errorf("failed to ping database: %w", err)
