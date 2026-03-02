@@ -23,11 +23,13 @@
 package router
 
 import (
+	"context"
 	"errors"
 	"io"
 	"log"
 	"net"
 	"strings"
+	"syscall"
 )
 
 // awaitContextDone waits for the context's cancellation or completion signal (ctx.Done()).
@@ -41,14 +43,19 @@ func (r *Router) awaitContextDone() {
 }
 
 // isClientDisconnected checks if the given error is indicative of a client disconnection.
+// This covers TCP-level errors, HTTP/2 stream errors, and context cancellations that
+// occur on Cloud Run when a client drops the connection or a request times out.
 func isClientDisconnected(err error) bool {
 
 	if err == nil {
 		return false
 	}
 
-	// Check for specific error types or error messages
-	if errors.Is(err, io.EOF) {
+	// Check for specific well-known error types
+	if errors.Is(err, io.EOF) ||
+		errors.Is(err, context.Canceled) ||
+		errors.Is(err, syscall.EPIPE) ||
+		errors.Is(err, syscall.ECONNRESET) {
 		return true
 	}
 
@@ -57,10 +64,20 @@ func isClientDisconnected(err error) bool {
 		return true
 	}
 
-	// Check error messages for common disconnection cases
+	// Check error messages for TCP and HTTP/2 disconnection cases
 	errMsg := strings.ToLower(err.Error())
-	if strings.Contains(errMsg, "broken pipe") || strings.Contains(errMsg, "connection reset by peer") {
-		return true
+	disconnectPatterns := []string{
+		"broken pipe",
+		"connection reset by peer",
+		"http2: stream closed",
+		"stream error",
+		"client disconnected",
+		"request canceled",
+	}
+	for _, pattern := range disconnectPatterns {
+		if strings.Contains(errMsg, pattern) {
+			return true
+		}
 	}
 
 	return false
